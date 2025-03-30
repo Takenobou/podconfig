@@ -61,7 +61,7 @@ Description=Podconfig Web Server
 After=network.target
 
 [Service]
-User=root
+User=user
 WorkingDirectory=/path/to/podconfig
 Environment=PODSYNC_CONFIG_PATH=/path/to/podsync/config.toml
 Environment=DOCKER_CONTAINER_NAME=podsync
