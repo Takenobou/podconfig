@@ -89,6 +89,7 @@
         border: none;
         border-top: 1px dotted #444;
       }
+
       /* Feed list styling */
       #feedListContainer {
         margin-top: 1rem;
@@ -99,27 +100,46 @@
         font-weight: bold;
       }
       .feed-item {
+        display: flex;
+        align-items: center;          /* Vertically center everything */
+        justify-content: space-between;
         padding: 0.5rem 0;
         border-bottom: 1px dotted #444;
-        text-align: left;
       }
-      .feed-item a {
-        color: #ffffff;
+      .feed-info {
+        display: flex;
+        flex-direction: column;       /* Stack channel name & XML link vertically */
+        gap: 0.5rem;
+      }
+      .feed-name {
+        color: #fff;
         text-decoration: none;
         font-weight: bold;
       }
-      .feed-item a:hover {
+      .feed-name:hover {
         text-decoration: underline;
       }
       .feed-xml {
         font-size: 0.8rem;
         color: #aaa;
         cursor: pointer;
-        margin-top: 0.25rem;
-        font-weight: normal;
       }
       .feed-xml:hover {
         color: #fff;
+        text-decoration: underline;
+      }
+      .btn-remove {
+        width: auto;
+        padding: 0.3rem 0.6rem;
+        border: 1px dotted #444;
+        background-color: #1f1f1f;
+        color: #f44336;
+        cursor: pointer;
+        font-weight: bold;
+      }
+      .btn-remove:hover {
+        background-color: #f44336;
+        color: #ffffff;
       }
     </style>
   </head>
@@ -145,8 +165,11 @@
         <h3>Feeds</h3>
         {{ range .Feeds }}
           <div class="feed-item">
-            <a href="{{ .URL }}" target="_blank">{{ .Name }}</a>
-            <div class="feed-xml" onclick="copyText(this)">{{ .XMLURL }}</div>
+            <div class="feed-info">
+              <a href="{{ .URL }}" target="_blank" class="feed-name">{{ .Name }}</a>
+              <span class="feed-xml" onclick="copyText(this, '{{ .XMLURL }}')">Copy XML path to clipboard</span>
+            </div>
+            <button type="button" class="btn-remove" onclick="removeFeed('{{ .Key }}')">Remove</button>
           </div>
         {{ else }}
           <div class="message">No feeds found.</div>
@@ -154,11 +177,15 @@
       </div>
     </div>
     <script>
-      // Function to copy text without showing a popup
-      function copyText(el) {
-        var text = el.textContent;
+      // Function to copy text and temporarily change the element text
+      function copyText(el, text) {
         navigator.clipboard.writeText(text)
           .then(function() {
+            var originalText = el.innerHTML;
+            el.innerHTML = "Copied XML path to clipboard!";
+            setTimeout(function() {
+              el.innerHTML = originalText;
+            }, 1000);
             console.log("Copied:", text);
           })
           .catch(function(err) {
@@ -180,8 +207,15 @@
             html += '<div class="message">No feeds found.</div>';
           } else {
             feeds.forEach(function(feed) {
-              html += '<div class="feed-item"><a href="' + feed.URL + '" target="_blank">' + feed.Name + '</a>';
-              html += '<div class="feed-xml" onclick="copyText(this)">' + feed.XMLURL + '</div></div>';
+              html += `
+  <div class="feed-item">
+    <div class="feed-info">
+      <a href="${feed.URL}" target="_blank" class="feed-name">${feed.Name}</a>
+      <span class="feed-xml" onclick="copyText(this, '${feed.XMLURL}')">Copy XML path to clipboard</span>
+    </div>
+    <button type="button" class="btn-remove" onclick="removeFeed('${feed.Key}')">Remove Feed</button>
+  </div>
+              `;
             });
           }
           container.innerHTML = html;
@@ -258,6 +292,30 @@
           btn.textContent = originalText;
         });
       });
+      
+      // Define removeFeed function to send request to remove a feed.
+      function removeFeed(feedKey) {
+        if (!confirm("Are you sure you want to remove this feed?")) return;
+        fetch("/remove", {
+          method: "POST",
+          headers: {
+            "X-Requested-With": "XMLHttpRequest",
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: "feedKey=" + encodeURIComponent(feedKey)
+        })
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById("messageContainer").innerHTML =
+            '<div class="message">' + data.message + '</div>';
+          refreshFeedList();
+        })
+        .catch(error => {
+          console.error("Error removing feed:", error);
+          document.getElementById("messageContainer").innerHTML =
+            '<div class="message">Error removing feed.</div>';
+        });
+      }
     </script>
   </body>
 </html>

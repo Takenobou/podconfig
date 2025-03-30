@@ -22,6 +22,7 @@ func main() {
 	http.HandleFunc("/add", handler.AddFeedHandler)
 	http.HandleFunc("/reload", handler.ReloadHandler)
 	http.HandleFunc("/feeds", handler.FeedListHandler)
+	http.HandleFunc("/remove", handler.RemoveFeedHandler)
 
 	log.Printf("Starting server on :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))

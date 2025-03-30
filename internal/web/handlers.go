@@ -113,6 +113,66 @@ func (h *Handler) ReloadHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(w, data)
 }
 
+// RemoveFeedHandler removes a feed entry from the TOML config based on the provided feed key.
+func (h *Handler) RemoveFeedHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	feedKey := r.FormValue("feedKey")
+	if feedKey == "" {
+		http.Error(w, "feedKey is required", http.StatusBadRequest)
+		return
+	}
+	// Read config file.
+	content, err := os.ReadFile(h.PodsyncConfigPath)
+	if err != nil {
+		log.Printf("Error reading config: %v", err)
+		http.Error(w, "Failed to read config", http.StatusInternalServerError)
+		return
+	}
+	var config map[string]interface{}
+	err = toml.Unmarshal(content, &config)
+	if err != nil {
+		log.Printf("Error unmarshalling config: %v", err)
+		http.Error(w, "Failed to parse config", http.StatusInternalServerError)
+		return
+	}
+	feeds, ok := config["feeds"].(map[string]interface{})
+	if !ok {
+		http.Error(w, "No feeds found", http.StatusInternalServerError)
+		return
+	}
+	if _, exists := feeds[feedKey]; !exists {
+		http.Error(w, "Feed not found", http.StatusNotFound)
+		return
+	}
+	delete(feeds, feedKey)
+	config["feeds"] = feeds
+	newContent, err := toml.Marshal(config)
+	if err != nil {
+		log.Printf("Error marshalling config: %v", err)
+		http.Error(w, "Failed to update config", http.StatusInternalServerError)
+		return
+	}
+	err = os.WriteFile(h.PodsyncConfigPath, newContent, 0644)
+	if err != nil {
+		log.Printf("Error writing config: %v", err)
+		http.Error(w, "Failed to write config", http.StatusInternalServerError)
+		return
+	}
+	successMsg := fmt.Sprintf("Feed for channel '%s' removed successfully!", feedKey)
+	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": successMsg})
+		return
+	}
+	data := map[string]interface{}{
+		"Message": successMsg,
+	}
+	tmpl.Execute(w, data)
+}
+
 // FeedListHandler returns a JSON array of current feed names.
 func (h *Handler) FeedListHandler(w http.ResponseWriter, r *http.Request) {
 	feedList, err := getFeedList(h.PodsyncConfigPath)
@@ -126,6 +186,7 @@ func (h *Handler) FeedListHandler(w http.ResponseWriter, r *http.Request) {
 
 // FeedListItem represents an entry in the feed list.
 type FeedListItem struct {
+	Key    string
 	Name   string
 	URL    string
 	XMLURL string
@@ -172,13 +233,14 @@ func getFeedList(configPath string) ([]FeedListItem, error) {
 			xmlURL = strings.TrimRight(hostname, "/") + "/" + key + ".xml"
 		}
 		feedList = append(feedList, FeedListItem{
+			Key:    key,
 			Name:   name,
 			URL:    urlVal,
 			XMLURL: xmlURL,
 		})
 	}
 
-	// Sort the feed list alphabetically by feed Name.
+	// Sort the feed list alphabetically by Name.
 	sort.Slice(feedList, func(i, j int) bool {
 		return feedList[i].Name < feedList[j].Name
 	})
