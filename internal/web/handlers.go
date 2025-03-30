@@ -2,6 +2,7 @@ package web
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"html/template"
 	"log"
@@ -14,6 +15,10 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
+var indexHTML string
+
+var tmpl = template.Must(template.New("index").Parse(indexHTML))
+
 type FeedInfo struct {
 	FeedKey        string
 	URL            string
@@ -21,42 +26,17 @@ type FeedInfo struct {
 	ProfilePicture string
 }
 
-var tmpl = template.Must(template.New("index").Parse(`
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <title>Podconfig</title>
-  </head>
-  <body>
-    <h1>Podconfig</h1>
-    <form method="POST" action="/add">
-      <label for="youtubeUrl">YouTube URL:</label>
-      <input type="text" id="youtubeUrl" name="youtubeUrl" required />
-      <button type="submit">Add Feed</button>
-    </form>
-    <br>
-    <form method="POST" action="/reload">
-      <button type="submit">Reload Docker Container</button>
-    </form>
-    <br>
-    {{if .Message}}
-      <p>{{.Message}}</p>
-    {{end}}
-  </body>
-</html>
-`))
-
 type Handler struct {
 	PodsyncConfigPath   string
 	DockerContainerName string
 }
 
+// Index renders the main page with no special data.
 func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(w, nil)
 }
 
-// AddFeedHandler handles form submission: it reads the YouTube URL, fetches channel info,
+// AddFeedHandler handles form submission: reads the YouTube URL, fetches channel info,
 // and appends the new feed entry to the Podsync config.
 func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -80,6 +60,7 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to update config", http.StatusInternalServerError)
 		return
 	}
+
 	data := map[string]interface{}{
 		"Message": fmt.Sprintf("Feed for channel '%s' added successfully!", feed.ChannelName),
 	}
@@ -102,6 +83,7 @@ func (h *Handler) ReloadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to reload docker container", http.StatusInternalServerError)
 		return
 	}
+
 	data := map[string]interface{}{
 		"Message": fmt.Sprintf("Docker container '%s' reloaded successfully!", h.DockerContainerName),
 	}
@@ -115,32 +97,39 @@ func fetchChannelInfo(youtubeUrl string) (*FeedInfo, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP status %d", resp.StatusCode)
 	}
+
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	// Extract the canonical link.
+
+	// Extract the canonical link
 	canonical, exists := doc.Find("link[rel='canonical']").Attr("href")
 	if !exists || canonical == "" {
 		return nil, fmt.Errorf("canonical link not found")
 	}
+
+	// If the canonical link doesn't contain /channel/, look for meta itemprop=channelId
 	if !strings.Contains(canonical, "/channel/") {
-		// Fall back to the meta tag with channelId.
 		channelId, exists := doc.Find("meta[itemprop='channelId']").Attr("content")
 		if !exists || channelId == "" {
 			return nil, fmt.Errorf("channel id not found")
 		}
 		canonical = "https://www.youtube.com/channel/" + channelId
 	}
+
 	channelName, exists := doc.Find("meta[property='og:title']").Attr("content")
 	if !exists || channelName == "" {
 		channelName = "Unknown Channel"
 	}
+
 	profilePic, _ := doc.Find("meta[property='og:image']").Attr("content")
-	feedKey := sanitize(channelName)
+	feedKey := sanitise(channelName)
+
 	return &FeedInfo{
 		FeedKey:        feedKey,
 		URL:            canonical,
@@ -156,17 +145,20 @@ func appendFeedToConfig(configPath string, feed *FeedInfo) error {
 	if err != nil {
 		return err
 	}
+
 	var config map[string]interface{}
 	err = toml.Unmarshal(content, &config)
 	if err != nil {
 		return err
 	}
+
 	feeds, ok := config["feeds"].(map[string]interface{})
 	if !ok {
 		feeds = make(map[string]interface{})
 		config["feeds"] = feeds
 	}
-	// Create the new feed entry.
+
+	// Build the new feed entry
 	newFeed := map[string]interface{}{
 		"url":             feed.URL,
 		"page_size":       50,
@@ -191,6 +183,7 @@ func appendFeedToConfig(configPath string, feed *FeedInfo) error {
 		},
 	}
 	feeds[feed.FeedKey] = newFeed
+
 	newContent, err := toml.Marshal(config)
 	if err != nil {
 		return err
@@ -198,7 +191,9 @@ func appendFeedToConfig(configPath string, feed *FeedInfo) error {
 	return os.WriteFile(configPath, newContent, 0644)
 }
 
-func sanitize(name string) string {
+// sanitise creates a feed key from the channel name by removing non-alphanumerics
+// and converting to lower-case.
+func sanitise(name string) string {
 	var sb strings.Builder
 	for _, r := range name {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {

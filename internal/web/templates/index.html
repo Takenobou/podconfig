@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Podconfig</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: monospace;
+      }
+
+      body {
+        background-color: #1f1f1f;
+        color: #f3f3f3;
+      }
+
+      .container {
+        width: 400px;
+        margin: 2rem auto;
+        padding: 1rem;
+        border: 1px dotted #444;
+        border-radius: 0;
+      }
+
+      .logo {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        cursor: pointer;
+      }
+      .logo .logo-part1 {
+        color: #ffffff;
+      }
+      .logo .logo-part2 {
+        color: #ff0000;
+      }
+      .logo:hover .logo-part1 {
+        color: #ff0000;
+      }
+      .logo:hover .logo-part2 {
+        color: #ffffff;
+      }
+
+      /* Message box for feedback */
+      .message {
+        margin-bottom: 1rem;
+        padding: 0.5rem;
+        border: 1px dotted #444;
+        background-color: #2f2f2f;
+        border-radius: 0;
+      }
+
+      /* Form label and input */
+      label {
+        display: block;
+        margin: 0.5rem 0 0.25rem;
+      }
+      input[type="text"] {
+        width: 100%;
+        padding: 0.4rem;
+        background-color: #2f2f2f;
+        border: 1px dotted #444;
+        border-radius: 0;
+        color: #f3f3f3;
+      }
+
+      /* Buttons */
+      button {
+        margin-top: 0.5rem;
+        padding: 0.4rem 0.8rem;
+        border: 1px dotted #444;
+        border-radius: 0;
+        background-color: #1f1f1f;
+        color: #f3f3f3;
+        cursor: pointer;
+      }
+      .btn-add:hover {
+        background-color: #4caf50; 
+      }
+      .btn-reload:hover {
+        background-color: #f44336; 
+      }
+
+      hr {
+        margin: 1.5rem 0;
+        border: none;
+        border-top: 1px dotted #444;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2 class="logo">
+        <span class="logo-part1">Pod</span><span class="logo-part2">sync</span>
+      </h2>
+
+      {{ if .Message }}
+        <div class="message">{{ .Message }}</div>
+      {{ end }}
+
+      <form method="POST" action="/add">
+        <label for="youtubeUrl">YouTube URL</label>
+        <input type="text" id="youtubeUrl" name="youtubeUrl" required />
+        <button type="submit" class="btn-add">Add Feed</button>
+      </form>
+
+      <hr />
+
+      <form method="POST" action="/reload">
+        <button type="submit" class="btn-reload">Reload Docker Container</button>
+      </form>
+    </div>
+  </body>
+</html>
