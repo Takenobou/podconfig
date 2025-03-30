@@ -179,19 +179,42 @@
     <script>
       // Function to copy text and temporarily change the element text
       function copyText(el, text) {
-        navigator.clipboard.writeText(text)
-          .then(function() {
-            var originalText = el.innerHTML;
-            el.innerHTML = "Copied XML path to clipboard!";
-            setTimeout(function() {
-              el.innerHTML = originalText;
-            }, 1000);
-            console.log("Copied:", text);
-          })
-          .catch(function(err) {
-            console.error("Error copying text:", err);
-          });
-      }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text)
+      .then(function() {
+        var originalText = el.innerHTML;
+        el.innerHTML = "Copied XML path to clipboard!";
+        setTimeout(function() {
+          el.innerHTML = originalText;
+        }, 1000);
+        console.log("Copied:", text);
+      })
+      .catch(function(err) {
+        console.error("Error copying text:", err);
+      });
+  } else {
+    var textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.top = 0;
+    textarea.style.left = 0;
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    try {
+      var successful = document.execCommand("copy");
+      var originalText = el.innerHTML;
+      el.innerHTML = "Copied XML path to clipboard!";
+      setTimeout(function() {
+        el.innerHTML = originalText;
+      }, 1000);
+      console.log("Fallback: Copied text:", text);
+    } catch (err) {
+      console.error("Fallback: Unable to copy", err);
+    }
+    document.body.removeChild(textarea);
+  }
+}
       
       // Refresh the feed list from the /feeds endpoint.
       function refreshFeedList() {
