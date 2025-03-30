@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -123,9 +124,11 @@ func (h *Handler) FeedListHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(feedList)
 }
 
+// FeedListItem represents an entry in the feed list.
 type FeedListItem struct {
-	Name string
-	URL  string
+	Name   string
+	URL    string
+	XMLURL string
 }
 
 func getFeedList(configPath string) ([]FeedListItem, error) {
@@ -142,24 +145,44 @@ func getFeedList(configPath string) ([]FeedListItem, error) {
 	if !ok {
 		return []FeedListItem{}, nil
 	}
+
+	// Get the server hostname from the [server] section.
+	var hostname string
+	if serverSection, ok := config["server"].(map[string]interface{}); ok {
+		hostname, _ = serverSection["hostname"].(string)
+	}
+
 	feedList := make([]FeedListItem, 0, len(feeds))
 	for key, v := range feeds {
 		entry, ok := v.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		urlVal, _ := entry["url"].(string)
-		title := key
+		// Default title is the feed key.
+		name := key
+		// If a custom title is set, use it.
 		if custom, ok := entry["custom"].(map[string]interface{}); ok {
 			if t, ok := custom["title"].(string); ok && t != "" {
-				title = t
+				name = t
 			}
 		}
+		urlVal, _ := entry["url"].(string)
+		xmlURL := ""
+		if hostname != "" {
+			xmlURL = strings.TrimRight(hostname, "/") + "/" + key + ".xml"
+		}
 		feedList = append(feedList, FeedListItem{
-			Name: title,
-			URL:  urlVal,
+			Name:   name,
+			URL:    urlVal,
+			XMLURL: xmlURL,
 		})
 	}
+
+	// Sort the feed list alphabetically by feed Name.
+	sort.Slice(feedList, func(i, j int) bool {
+		return feedList[i].Name < feedList[j].Name
+	})
+
 	return feedList, nil
 }
 

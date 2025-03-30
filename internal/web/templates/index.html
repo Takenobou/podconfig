@@ -32,6 +32,7 @@
       }
       .logo {
         font-size: 1.5rem;
+        font-weight: bold;
         margin-bottom: 1rem;
         text-align: center;
         cursor: pointer;
@@ -53,10 +54,12 @@
         padding: 0.5rem;
         border: 1px dotted #444;
         background-color: #2f2f2f;
+        font-weight: bold;
       }
       label {
         display: block;
         margin: 0.5rem 0 0.25rem;
+        font-weight: bold;
       }
       input[type="text"] {
         width: 100%;
@@ -73,25 +76,27 @@
         background-color: #1f1f1f;
         color: #f3f3f3;
         cursor: pointer;
+        font-weight: bold;
       }
       .btn-add:hover {
         background-color: #4caf50;
       }
       .btn-reload:hover {
-        background-color: #f44336;
+        background-color: #2196F3;
       }
       hr {
         margin: 1.5rem 0;
         border: none;
         border-top: 1px dotted #444;
       }
-      /* Style for feed list */
+      /* Feed list styling */
       #feedListContainer {
         margin-top: 1rem;
       }
       #feedListContainer h3 {
-        margin-bottom: 0.5rem;
         text-align: left;
+        margin-bottom: 0.5rem;
+        font-weight: bold;
       }
       .feed-item {
         padding: 0.5rem 0;
@@ -99,11 +104,22 @@
         text-align: left;
       }
       .feed-item a {
-        color: #4caf50;
+        color: #ffffff;
         text-decoration: none;
+        font-weight: bold;
       }
       .feed-item a:hover {
         text-decoration: underline;
+      }
+      .feed-xml {
+        font-size: 0.8rem;
+        color: #aaa;
+        cursor: pointer;
+        margin-top: 0.25rem;
+        font-weight: normal;
+      }
+      .feed-xml:hover {
+        color: #fff;
       }
     </style>
   </head>
@@ -130,6 +146,7 @@
         {{ range .Feeds }}
           <div class="feed-item">
             <a href="{{ .URL }}" target="_blank">{{ .Name }}</a>
+            <div class="feed-xml" onclick="copyText(this)">{{ .XMLURL }}</div>
           </div>
         {{ else }}
           <div class="message">No feeds found.</div>
@@ -137,6 +154,18 @@
       </div>
     </div>
     <script>
+      // Function to copy text without showing a popup
+      function copyText(el) {
+        var text = el.textContent;
+        navigator.clipboard.writeText(text)
+          .then(function() {
+            console.log("Copied:", text);
+          })
+          .catch(function(err) {
+            console.error("Error copying text:", err);
+          });
+      }
+      
       // Refresh the feed list from the /feeds endpoint.
       function refreshFeedList() {
         fetch("/feeds", {
@@ -146,13 +175,13 @@
         .then(response => response.json())
         .then(feeds => {
           var container = document.getElementById("feedListContainer");
-          // Build HTML content for each feed.
           var html = "<h3>Feeds</h3>";
           if (feeds.length === 0) {
             html += '<div class="message">No feeds found.</div>';
           } else {
             feeds.forEach(function(feed) {
-              html += '<div class="feed-item"><a href="' + feed.URL + '" target="_blank">' + feed.Name + '</a></div>';
+              html += '<div class="feed-item"><a href="' + feed.URL + '" target="_blank">' + feed.Name + '</a>';
+              html += '<div class="feed-xml" onclick="copyText(this)">' + feed.XMLURL + '</div></div>';
             });
           }
           container.innerHTML = html;
