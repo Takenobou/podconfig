@@ -84,11 +84,8 @@ func (h *Handler) ReloadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to reload docker container", http.StatusInternalServerError)
 		return
 	}
-
-	data := map[string]interface{}{
-		"Message": fmt.Sprintf("Docker container '%s' reloaded successfully!", h.DockerContainerName),
-	}
-	tmpl.Execute(w, data)
+	// Redirect to the main page after a successful reload
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 // fetchChannelInfo fetches the provided YouTube URL and extracts channel details.
