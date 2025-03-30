@@ -85,6 +85,26 @@
         border: none;
         border-top: 1px dotted #444;
       }
+      /* Style for feed list */
+      #feedListContainer {
+        margin-top: 1rem;
+      }
+      #feedListContainer h3 {
+        margin-bottom: 0.5rem;
+        text-align: left;
+      }
+      .feed-item {
+        padding: 0.5rem 0;
+        border-bottom: 1px dotted #444;
+        text-align: left;
+      }
+      .feed-item a {
+        color: #4caf50;
+        text-decoration: none;
+      }
+      .feed-item a:hover {
+        text-decoration: underline;
+      }
     </style>
   </head>
   <body>
@@ -92,52 +112,90 @@
       <h2 class="logo">
         <span class="logo-part1">Pod</span><span class="logo-part2">config</span>
       </h2>
-
       <div id="messageContainer">
         {{ if .Message }}
           <div class="message">{{ .Message }}</div>
         {{ end }}
       </div>
-
       <form id="addFeedForm">
         <label for="youtubeUrl">YouTube URL</label>
         <input type="text" id="youtubeUrl" name="youtubeUrl" required />
         <button type="submit" id="addFeedBtn" class="btn-add">Add Feed</button>
       </form>
-
       <hr />
-
       <button type="button" id="reloadBtn" class="btn-reload">Reload Docker Container</button>
+      <hr />
+      <div id="feedListContainer">
+        <h3>Feeds</h3>
+        {{ range .Feeds }}
+          <div class="feed-item">
+            <a href="{{ .URL }}" target="_blank">{{ .Name }}</a>
+          </div>
+        {{ else }}
+          <div class="message">No feeds found.</div>
+        {{ end }}
+      </div>
     </div>
-
     <script>
-        document.getElementById("reloadBtn").addEventListener("click", function() {
-          var btn = this;
-          btn.disabled = true;
-          var originalText = btn.textContent;
-          btn.textContent = "Reloading…";
-      
-          fetch("/reload", {
-            method: "POST",
-            headers: { "X-Requested-With": "XMLHttpRequest" }
-          })
-          .then(response => response.json())
-          .then(data => {
-            document.getElementById("messageContainer").innerHTML =
-              '<div class="message">' + data.message + '</div>';
-            btn.disabled = false;
-            btn.textContent = originalText;
-          })
-          .catch(error => {
-            document.getElementById("messageContainer").innerHTML =
-              '<div class="message">Error reloading container.</div>';
-            console.error("Error reloading container:", error);
-            btn.disabled = false;
-            btn.textContent = originalText;
-          });
+      // Refresh the feed list from the /feeds endpoint.
+      function refreshFeedList() {
+        fetch("/feeds", {
+          method: "GET",
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+        .then(response => response.json())
+        .then(feeds => {
+          var container = document.getElementById("feedListContainer");
+          // Build HTML content for each feed.
+          var html = "<h3>Feeds</h3>";
+          if (feeds.length === 0) {
+            html += '<div class="message">No feeds found.</div>';
+          } else {
+            feeds.forEach(function(feed) {
+              html += '<div class="feed-item"><a href="' + feed.URL + '" target="_blank">' + feed.Name + '</a></div>';
+            });
+          }
+          container.innerHTML = html;
+        })
+        .catch(error => {
+          console.error("Error refreshing feed list:", error);
+          document.getElementById("feedListContainer").innerHTML =
+            '<div class="message">Error loading feed list.</div>';
         });
-
-        document.getElementById("addFeedForm").addEventListener("submit", function(event) {
+      }
+      
+      // Refresh feed list on page load.
+      refreshFeedList();
+      
+      // Handle reload button via AJAX.
+      document.getElementById("reloadBtn").addEventListener("click", function() {
+        var btn = this;
+        btn.disabled = true;
+        var originalText = btn.textContent;
+        btn.textContent = "Reloading…";
+        fetch("/reload", {
+          method: "POST",
+          headers: { "X-Requested-With": "XMLHttpRequest" }
+        })
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById("messageContainer").innerHTML =
+            '<div class="message">' + data.message + '</div>';
+          btn.disabled = false;
+          btn.textContent = originalText;
+          refreshFeedList();
+        })
+        .catch(error => {
+          document.getElementById("messageContainer").innerHTML =
+            '<div class="message">Error reloading container.</div>';
+          console.error("Error reloading container:", error);
+          btn.disabled = false;
+          btn.textContent = originalText;
+        });
+      });
+      
+      // Handle add feed form via AJAX.
+      document.getElementById("addFeedForm").addEventListener("submit", function(event) {
         event.preventDefault();
         var btn = document.getElementById("addFeedBtn");
         btn.disabled = true;
@@ -161,6 +219,7 @@
           btn.disabled = false;
           btn.textContent = originalText;
           document.getElementById("youtubeUrl").value = "";
+          refreshFeedList();
         })
         .catch(error => {
           document.getElementById("messageContainer").innerHTML =
@@ -170,6 +229,6 @@
           btn.textContent = originalText;
         });
       });
-      </script>
+    </script>
   </body>
 </html>

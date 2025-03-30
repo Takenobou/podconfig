@@ -9,7 +9,6 @@ import (
 )
 
 func main() {
-	// Load configuration from environment variables.
 	cfg := config.LoadConfig()
 
 	handler := &web.Handler{
@@ -22,6 +21,7 @@ func main() {
 	http.HandleFunc("/", handler.Index)
 	http.HandleFunc("/add", handler.AddFeedHandler)
 	http.HandleFunc("/reload", handler.ReloadHandler)
+	http.HandleFunc("/feeds", handler.FeedListHandler)
 
 	log.Printf("Starting server on :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))

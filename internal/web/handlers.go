@@ -33,20 +33,22 @@ type Handler struct {
 	DockerContainerName string
 }
 
-// Index renders the main page with no special data.
 func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
-	msg := r.URL.Query().Get("message")
-	log.Printf("Index handler received message: %q", msg)
-	err := tmpl.Execute(w, map[string]interface{}{
-		"Message": msg,
-	})
+	feedList, err := getFeedList(h.PodsyncConfigPath)
 	if err != nil {
+		log.Printf("Error reading feed list: %v", err)
+		feedList = []FeedListItem{}
+	}
+	data := map[string]interface{}{
+		"Message": r.URL.Query().Get("message"),
+		"Feeds":   feedList,
+	}
+	if err := tmpl.Execute(w, data); err != nil {
 		log.Printf("Error executing template: %v", err)
 	}
 }
 
-// AddFeedHandler handles form submission: reads the YouTube URL, fetches channel info,
-// and appends the new feed entry to the Podsync config.
+// AddFeedHandler handles the form submission to add a new feed.
 func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -81,7 +83,7 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(w, data)
 }
 
-// ReloadHandler executes "docker restart" for the container specified in the config.
+// ReloadHandler executes "docker restart" for the configured container.
 func (h *Handler) ReloadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -99,43 +101,86 @@ func (h *Handler) ReloadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	successMsg := fmt.Sprintf("Docker container '%s' reloaded successfully!", h.DockerContainerName)
 	log.Printf("Reload successful: %s", successMsg)
-	// Check if the request is AJAX
 	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"message": successMsg})
 		return
 	}
-	// Fallback (if not an AJAX request) - render template
 	data := map[string]interface{}{
 		"Message": successMsg,
 	}
 	tmpl.Execute(w, data)
 }
 
-// fetchChannelInfo fetches the provided YouTube URL and extracts channel details.
+// FeedListHandler returns a JSON array of current feed names.
+func (h *Handler) FeedListHandler(w http.ResponseWriter, r *http.Request) {
+	feedList, err := getFeedList(h.PodsyncConfigPath)
+	if err != nil {
+		http.Error(w, "Failed to load feed list", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(feedList)
+}
+
+type FeedListItem struct {
+	Name string
+	URL  string
+}
+
+func getFeedList(configPath string) ([]FeedListItem, error) {
+	content, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, err
+	}
+	var config map[string]interface{}
+	err = toml.Unmarshal(content, &config)
+	if err != nil {
+		return nil, err
+	}
+	feeds, ok := config["feeds"].(map[string]interface{})
+	if !ok {
+		return []FeedListItem{}, nil
+	}
+	feedList := make([]FeedListItem, 0, len(feeds))
+	for key, v := range feeds {
+		entry, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		urlVal, _ := entry["url"].(string)
+		title := key
+		if custom, ok := entry["custom"].(map[string]interface{}); ok {
+			if t, ok := custom["title"].(string); ok && t != "" {
+				title = t
+			}
+		}
+		feedList = append(feedList, FeedListItem{
+			Name: title,
+			URL:  urlVal,
+		})
+	}
+	return feedList, nil
+}
+
+// fetchChannelInfo retrieves the channel info from the YouTube URL.
 func fetchChannelInfo(youtubeUrl string) (*FeedInfo, error) {
 	resp, err := http.Get(youtubeUrl)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP status %d", resp.StatusCode)
 	}
-
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-
-	// Extract the canonical link
 	canonical, exists := doc.Find("link[rel='canonical']").Attr("href")
 	if !exists || canonical == "" {
 		return nil, fmt.Errorf("canonical link not found")
 	}
-
-	// If the canonical link doesn't contain /channel/, look for meta itemprop=channelId
 	if !strings.Contains(canonical, "/channel/") {
 		channelId, exists := doc.Find("meta[itemprop='channelId']").Attr("content")
 		if !exists || channelId == "" {
@@ -143,15 +188,12 @@ func fetchChannelInfo(youtubeUrl string) (*FeedInfo, error) {
 		}
 		canonical = "https://www.youtube.com/channel/" + channelId
 	}
-
 	channelName, exists := doc.Find("meta[property='og:title']").Attr("content")
 	if !exists || channelName == "" {
 		channelName = "Unknown Channel"
 	}
-
 	profilePic, _ := doc.Find("meta[property='og:image']").Attr("content")
 	feedKey := sanitise(channelName)
-
 	return &FeedInfo{
 		FeedKey:        feedKey,
 		URL:            canonical,
@@ -160,27 +202,22 @@ func fetchChannelInfo(youtubeUrl string) (*FeedInfo, error) {
 	}, nil
 }
 
-// appendFeedToConfig loads the Podsync config from configPath, adds (or updates) the feed,
-// and writes the file back.
+// appendFeedToConfig updates the config file with the new feed.
 func appendFeedToConfig(configPath string, feed *FeedInfo) error {
 	content, err := os.ReadFile(configPath)
 	if err != nil {
 		return err
 	}
-
 	var config map[string]interface{}
 	err = toml.Unmarshal(content, &config)
 	if err != nil {
 		return err
 	}
-
 	feeds, ok := config["feeds"].(map[string]interface{})
 	if !ok {
 		feeds = make(map[string]interface{})
 		config["feeds"] = feeds
 	}
-
-	// Build the new feed entry
 	newFeed := map[string]interface{}{
 		"url":             feed.URL,
 		"page_size":       50,
@@ -205,7 +242,6 @@ func appendFeedToConfig(configPath string, feed *FeedInfo) error {
 		},
 	}
 	feeds[feed.FeedKey] = newFeed
-
 	newContent, err := toml.Marshal(config)
 	if err != nil {
 		return err
@@ -213,8 +249,7 @@ func appendFeedToConfig(configPath string, feed *FeedInfo) error {
 	return os.WriteFile(configPath, newContent, 0644)
 }
 
-// sanitise creates a feed key from the channel name by removing non-alphanumerics
-// and converting to lower-case.
+// sanitise creates a feed key from the channel name.
 func sanitise(name string) string {
 	var sb strings.Builder
 	for _, r := range name {
