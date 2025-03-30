@@ -11,13 +11,11 @@
         padding: 0;
         font-family: monospace;
       }
-
       body {
         background-color: #1f1f1f;
         color: #f3f3f3;
         padding: 1rem;
       }
-
       .container {
         width: 90%;
         max-width: 400px;
@@ -25,15 +23,13 @@
         padding: 1rem;
         border: 1px dotted #444;
       }
-
       @media (max-width: 400px) {
         .container {
-        margin-left: 10px;
-        margin-right: 10px;
-        width: auto;
+          margin-left: 10px;
+          margin-right: 10px;
+          width: auto;
         }
-        }
-
+      }
       .logo {
         font-size: 1.5rem;
         margin-bottom: 1rem;
@@ -52,14 +48,12 @@
       .logo:hover .logo-part2 {
         color: #ffffff;
       }
-
       .message {
         margin-bottom: 1rem;
         padding: 0.5rem;
         border: 1px dotted #444;
         background-color: #2f2f2f;
       }
-
       label {
         display: block;
         margin: 0.5rem 0 0.25rem;
@@ -71,7 +65,6 @@
         border: 1px dotted #444;
         color: #f3f3f3;
       }
-
       button {
         width: 100%;
         margin-top: 0.5rem;
@@ -82,12 +75,11 @@
         cursor: pointer;
       }
       .btn-add:hover {
-        background-color: #4caf50; 
+        background-color: #4caf50;
       }
       .btn-reload:hover {
         background-color: #f44336;
       }
-
       hr {
         margin: 1.5rem 0;
         border: none;
@@ -101,21 +93,83 @@
         <span class="logo-part1">Pod</span><span class="logo-part2">config</span>
       </h2>
 
-      {{ if .Message }}
-        <div class="message">{{ .Message }}</div>
-      {{ end }}
+      <div id="messageContainer">
+        {{ if .Message }}
+          <div class="message">{{ .Message }}</div>
+        {{ end }}
+      </div>
 
-      <form method="POST" action="/add">
+      <form id="addFeedForm">
         <label for="youtubeUrl">YouTube URL</label>
         <input type="text" id="youtubeUrl" name="youtubeUrl" required />
-        <button type="submit" class="btn-add">Add Feed</button>
+        <button type="submit" id="addFeedBtn" class="btn-add">Add Feed</button>
       </form>
 
       <hr />
 
-      <form method="POST" action="/reload">
-        <button type="submit" class="btn-reload">Reload Docker Container</button>
-      </form>
+      <button type="button" id="reloadBtn" class="btn-reload">Reload Docker Container</button>
     </div>
+
+    <script>
+        document.getElementById("reloadBtn").addEventListener("click", function() {
+          var btn = this;
+          btn.disabled = true;
+          var originalText = btn.textContent;
+          btn.textContent = "Reloading…";
+      
+          fetch("/reload", {
+            method: "POST",
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+          })
+          .then(response => response.json())
+          .then(data => {
+            document.getElementById("messageContainer").innerHTML =
+              '<div class="message">' + data.message + '</div>';
+            btn.disabled = false;
+            btn.textContent = originalText;
+          })
+          .catch(error => {
+            document.getElementById("messageContainer").innerHTML =
+              '<div class="message">Error reloading container.</div>';
+            console.error("Error reloading container:", error);
+            btn.disabled = false;
+            btn.textContent = originalText;
+          });
+        });
+
+        document.getElementById("addFeedForm").addEventListener("submit", function(event) {
+        event.preventDefault();
+        var btn = document.getElementById("addFeedBtn");
+        btn.disabled = true;
+        var originalText = btn.textContent;
+        btn.textContent = "Adding Feed…";
+        var youtubeUrl = document.getElementById("youtubeUrl").value;
+        var formData = new URLSearchParams();
+        formData.append("youtubeUrl", youtubeUrl);
+        fetch("/add", {
+          method: "POST",
+          headers: { 
+            "X-Requested-With": "XMLHttpRequest", 
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: formData.toString()
+        })
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById("messageContainer").innerHTML =
+            '<div class="message">' + data.message + '</div>';
+          btn.disabled = false;
+          btn.textContent = originalText;
+          document.getElementById("youtubeUrl").value = "";
+        })
+        .catch(error => {
+          document.getElementById("messageContainer").innerHTML =
+            '<div class="message">Error adding feed.</div>';
+          console.error("Error adding feed:", error);
+          btn.disabled = false;
+          btn.textContent = originalText;
+        });
+      });
+      </script>
   </body>
 </html>

@@ -3,6 +3,7 @@ package web
 import (
 	"bytes"
 	_ "embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
@@ -34,7 +35,14 @@ type Handler struct {
 
 // Index renders the main page with no special data.
 func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
-	tmpl.Execute(w, nil)
+	msg := r.URL.Query().Get("message")
+	log.Printf("Index handler received message: %q", msg)
+	err := tmpl.Execute(w, map[string]interface{}{
+		"Message": msg,
+	})
+	if err != nil {
+		log.Printf("Error executing template: %v", err)
+	}
 }
 
 // AddFeedHandler handles form submission: reads the YouTube URL, fetches channel info,
@@ -61,9 +69,14 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to update config", http.StatusInternalServerError)
 		return
 	}
-
+	successMsg := fmt.Sprintf("Feed for channel '%s' added successfully!", feed.ChannelName)
+	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": successMsg})
+		return
+	}
 	data := map[string]interface{}{
-		"Message": fmt.Sprintf("Feed for channel '%s' added successfully!", feed.ChannelName),
+		"Message": successMsg,
 	}
 	tmpl.Execute(w, data)
 }
@@ -71,7 +84,7 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 // ReloadHandler executes "docker restart" for the container specified in the config.
 func (h *Handler) ReloadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	cmd := exec.Command("docker", "restart", h.DockerContainerName)
@@ -84,8 +97,19 @@ func (h *Handler) ReloadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to reload docker container", http.StatusInternalServerError)
 		return
 	}
-	// Redirect to the main page after a successful reload
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	successMsg := fmt.Sprintf("Docker container '%s' reloaded successfully!", h.DockerContainerName)
+	log.Printf("Reload successful: %s", successMsg)
+	// Check if the request is AJAX
+	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": successMsg})
+		return
+	}
+	// Fallback (if not an AJAX request) - render template
+	data := map[string]interface{}{
+		"Message": successMsg,
+	}
+	tmpl.Execute(w, data)
 }
 
 // fetchChannelInfo fetches the provided YouTube URL and extracts channel details.
@@ -160,23 +184,23 @@ func appendFeedToConfig(configPath string, feed *FeedInfo) error {
 	newFeed := map[string]interface{}{
 		"url":             feed.URL,
 		"page_size":       50,
-		"update_period":   "6h",
+		"update_period":   "1h",
 		"quality":         "high",
 		"format":          "video",
 		"opml":            true,
-		"cron_schedule":   "@every 6h",
+		"cron_schedule":   "@every 1h",
 		"private_feed":    false,
 		"youtube_dl_args": []string{"--add-metadata", "--embed-thumbnail", "--write-description"},
 		"clean":           map[string]interface{}{"keep_last": 20},
 		"filters":         map[string]interface{}{"max_age": 90},
 		"custom": map[string]interface{}{
 			"title":         feed.ChannelName,
-			"description":   "Episodes from '" + feed.ChannelName + "' channel in podcast format.",
+			"description":   "Episodes from the '" + feed.ChannelName + "' Youtube channel in a podcast format.",
 			"author":        feed.ChannelName,
 			"cover_art":     feed.ProfilePicture,
 			"lang":          "en",
-			"category":      "News",
-			"subcategories": []string{"Politics", "Commentary"},
+			"category":      "Entertainment",
+			"subcategories": []string{"Commentary"},
 			"explicit":      false,
 		},
 	}
