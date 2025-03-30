@@ -1,26 +1,30 @@
 package config
 
-import (
-	"os"
-
-	"github.com/pelletier/go-toml/v2"
-)
+import "os"
 
 type AppConfig struct {
-	PodsyncConfigPath   string `toml:"podsync_config_path"`
-	DockerContainerName string `toml:"docker_container_name"`
-	ServerPort          string `toml:"server_port"`
+	PodsyncConfigPath   string
+	DockerContainerName string
+	ServerPort          string
 }
 
-func LoadConfig(path string) (*AppConfig, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
+// LoadConfig loads configuration from environment variables, falling back to defaults.
+func LoadConfig() *AppConfig {
+	cfg := &AppConfig{
+		PodsyncConfigPath:   os.Getenv("PODSYNC_CONFIG_PATH"),
+		DockerContainerName: os.Getenv("DOCKER_CONTAINER_NAME"),
+		ServerPort:          os.Getenv("SERVER_PORT"),
 	}
-	var cfg AppConfig
-	err = toml.Unmarshal(data, &cfg)
-	if err != nil {
-		return nil, err
+
+	if cfg.PodsyncConfigPath == "" {
+		cfg.PodsyncConfigPath = "../config.toml"
 	}
-	return &cfg, nil
+	if cfg.DockerContainerName == "" {
+		cfg.DockerContainerName = "podsync"
+	}
+	if cfg.ServerPort == "" {
+		cfg.ServerPort = "8080"
+	}
+
+	return cfg
 }
