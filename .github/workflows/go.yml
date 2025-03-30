@@ -1,0 +1,33 @@
+name: Go Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24.0'
+
+      - name: Build
+        run: |
+          # Build the main binary from cmd/podconfig
+          go build -v -o podconfig ./cmd/podconfig
+
+      - name: Test
+        run: go test -v ./...
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: podconfig-binary
+          path: podconfig
