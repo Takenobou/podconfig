@@ -72,7 +72,7 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to update config", http.StatusInternalServerError)
 		return
 	}
-	successMsg := fmt.Sprintf("Feed for channel '%s' added successfully!", feed.ChannelName)
+	successMsg := fmt.Sprintf("Feed for channel '%s' added successfully! Reload the docker container to update Podsync.", feed.ChannelName)
 	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"message": successMsg})
@@ -161,7 +161,7 @@ func (h *Handler) RemoveFeedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to write config", http.StatusInternalServerError)
 		return
 	}
-	successMsg := fmt.Sprintf("Feed for channel '%s' removed successfully!", feedKey)
+	successMsg := fmt.Sprintf("Feed for channel '%s' removed successfully! Reload the docker container to update Podsync.", feedKey)
 	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"message": successMsg})

@@ -159,7 +159,7 @@
         <button type="submit" id="addFeedBtn" class="btn-add">Add Feed</button>
       </form>
       <hr />
-      <button type="button" id="reloadBtn" class="btn-reload">Reload Docker Container</button>
+      <button type="button" id="reloadBtn" class="btn-reload">Reload Podsync Docker Container</button>
       <hr />
       <div id="feedListContainer">
         <h3>Feeds</h3>
@@ -169,7 +169,7 @@
               <a href="{{ .URL }}" target="_blank" class="feed-name">{{ .Name }}</a>
               <span class="feed-xml" onclick="copyText(this, '{{ .XMLURL }}')">Copy XML path to clipboard</span>
             </div>
-            <button type="button" class="btn-remove" onclick="removeFeed('{{ .Key }}')">Remove</button>
+            <button type="button" class="btn-remove" onclick="removeFeed(this, '{{ .Key }}')">Remove</button>
           </div>
         {{ else }}
           <div class="message">No feeds found.</div>
@@ -213,7 +213,7 @@
       <a href="${feed.URL}" target="_blank" class="feed-name">${feed.Name}</a>
       <span class="feed-xml" onclick="copyText(this, '${feed.XMLURL}')">Copy XML path to clipboard</span>
     </div>
-    <button type="button" class="btn-remove" onclick="removeFeed('${feed.Key}')">Remove Feed</button>
+    <button type="button" class="btn-remove" onclick="removeFeed(this, '${feed.Key}')">Remove Feed</button>
   </div>
               `;
             });
@@ -293,26 +293,37 @@
         });
       });
       
-      // Define removeFeed function to send request to remove a feed.
-      function removeFeed(feedKey) {
-        if (!confirm("Are you sure you want to remove this feed?")) return;
-        fetch("/remove", {
-          method: "POST",
+      function removeFeed(button, feedKey) {
+
+        if (button.innerHTML.trim() !== 'Confirm Remove' && button.innerHTML.trim() !== 'Remove Feed') {
+        }
+        if (button.innerHTML.trim() !== 'Confirm Remove') {
+          var originalText = button.innerHTML;
+          button.innerHTML = 'Confirm Remove';
+          setTimeout(function() {
+            if (button.innerHTML.trim() === 'Confirm Remove') {
+              button.innerHTML = originalText;
+            }
+          }, 3000);
+          return;
+        }
+        fetch('/remove', {
+          method: 'POST',
           headers: {
-            "X-Requested-With": "XMLHttpRequest",
-            "Content-Type": "application/x-www-form-urlencoded"
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/x-www-form-urlencoded'
           },
-          body: "feedKey=" + encodeURIComponent(feedKey)
+          body: 'feedKey=' + encodeURIComponent(feedKey)
         })
         .then(response => response.json())
         .then(data => {
-          document.getElementById("messageContainer").innerHTML =
+          document.getElementById('messageContainer').innerHTML =
             '<div class="message">' + data.message + '</div>';
           refreshFeedList();
         })
         .catch(error => {
-          console.error("Error removing feed:", error);
-          document.getElementById("messageContainer").innerHTML =
+          console.error('Error removing feed:', error);
+          document.getElementById('messageContainer').innerHTML =
             '<div class="message">Error removing feed.</div>';
         });
       }
