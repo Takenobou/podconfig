@@ -18,7 +18,7 @@ Podconfig is a lightweight web configuration interface for [Podsync](https://git
 1. **Clone the Repository:**
 
    ```bash
-   git clone https://github.com/yourusername/podconfig.git
+   git clone https://github.com/Takenobou/podconfig.git
    cd podconfig
    ```
 
