@@ -1,0 +1,3 @@
+podsync_config_path = "../config-test.toml"
+docker_container_name = "podsync"
+server_port = "8080"
