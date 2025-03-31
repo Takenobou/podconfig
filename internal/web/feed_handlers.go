@@ -1,15 +1,12 @@
 package web
 
 import (
-	"bytes"
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,6 +17,7 @@ import (
 
 var tmpl = template.Must(template.New("index").Parse(indexHTML))
 
+// FeedInfo holds information about a feed.
 type FeedInfo struct {
 	FeedKey        string
 	URL            string
@@ -27,11 +25,15 @@ type FeedInfo struct {
 	ProfilePicture string
 }
 
-type Handler struct {
-	PodsyncConfigPath   string
-	DockerContainerName string
+// FeedListItem represents an entry in the feed list.
+type FeedListItem struct {
+	Key    string
+	Name   string
+	URL    string
+	XMLURL string
 }
 
+// Index handles the main page rendering.
 func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 	feedList, err := getFeedList(h.PodsyncConfigPath)
 	if err != nil {
@@ -47,7 +49,7 @@ func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// AddFeedHandler handles the form submission to add a new feed.
+// AddFeedHandler handles adding a new feed.
 func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -58,7 +60,6 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "YouTube URL is required", http.StatusBadRequest)
 		return
 	}
-	// Read additional optional configuration values
 	updatePeriod := r.FormValue("update_period")
 	if updatePeriod == "" {
 		updatePeriod = "1h"
@@ -67,17 +68,15 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 	if feedFormat == "" {
 		feedFormat = "video"
 	}
-	cleanKeepLastStr := r.FormValue("clean_keep_last")
 	cleanKeepLast := 20
-	if cleanKeepLastStr != "" {
-		if v, err := strconv.Atoi(cleanKeepLastStr); err == nil {
+	if val := r.FormValue("clean_keep_last"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
 			cleanKeepLast = v
 		}
 	}
-	maxAgeStr := r.FormValue("max_age")
 	maxAge := 90
-	if maxAgeStr != "" {
-		if v, err := strconv.Atoi(maxAgeStr); err == nil {
+	if val := r.FormValue("max_age"); val != "" {
+		if v, err := strconv.Atoi(val); err == nil {
 			maxAge = v
 		}
 	}
@@ -105,36 +104,7 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(w, data)
 }
 
-// ReloadHandler executes "docker restart" for the configured container.
-func (h *Handler) ReloadHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	cmd := exec.Command("docker", "restart", h.DockerContainerName)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	err := cmd.Run()
-	if err != nil {
-		log.Printf("Error restarting container: %v, output: %s", err, out.String())
-		http.Error(w, "Failed to reload docker container", http.StatusInternalServerError)
-		return
-	}
-	successMsg := fmt.Sprintf("Docker container '%s' reloaded successfully!", h.DockerContainerName)
-	log.Printf("Reload successful: %s", successMsg)
-	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"message": successMsg})
-		return
-	}
-	data := map[string]interface{}{
-		"Message": successMsg,
-	}
-	tmpl.Execute(w, data)
-}
-
-// RemoveFeedHandler removes a feed entry from the TOML config based on the provided feed key.
+// RemoveFeedHandler handles removing a feed.
 func (h *Handler) RemoveFeedHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
@@ -145,7 +115,6 @@ func (h *Handler) RemoveFeedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "feedKey is required", http.StatusBadRequest)
 		return
 	}
-	// Read config file.
 	content, err := os.ReadFile(h.PodsyncConfigPath)
 	if err != nil {
 		log.Printf("Error reading config: %v", err)
@@ -194,7 +163,7 @@ func (h *Handler) RemoveFeedHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(w, data)
 }
 
-// FeedListHandler returns a JSON array of current feed names.
+// FeedListHandler returns the list of feeds in JSON.
 func (h *Handler) FeedListHandler(w http.ResponseWriter, r *http.Request) {
 	feedList, err := getFeedList(h.PodsyncConfigPath)
 	if err != nil {
@@ -203,14 +172,6 @@ func (h *Handler) FeedListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(feedList)
-}
-
-// FeedListItem represents an entry in the feed list.
-type FeedListItem struct {
-	Key    string
-	Name   string
-	URL    string
-	XMLURL string
 }
 
 func getFeedList(configPath string) ([]FeedListItem, error) {
@@ -227,22 +188,17 @@ func getFeedList(configPath string) ([]FeedListItem, error) {
 	if !ok {
 		return []FeedListItem{}, nil
 	}
-
-	// Get the server hostname from the [server] section.
 	var hostname string
 	if serverSection, ok := config["server"].(map[string]interface{}); ok {
 		hostname, _ = serverSection["hostname"].(string)
 	}
-
 	feedList := make([]FeedListItem, 0, len(feeds))
 	for key, v := range feeds {
 		entry, ok := v.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		// Default title is the feed key.
 		name := key
-		// If a custom title is set, use it.
 		if custom, ok := entry["custom"].(map[string]interface{}); ok {
 			if t, ok := custom["title"].(string); ok && t != "" {
 				name = t
@@ -260,16 +216,12 @@ func getFeedList(configPath string) ([]FeedListItem, error) {
 			XMLURL: xmlURL,
 		})
 	}
-
-	// Sort the feed list alphabetically by Name.
 	sort.Slice(feedList, func(i, j int) bool {
 		return feedList[i].Name < feedList[j].Name
 	})
-
 	return feedList, nil
 }
 
-// fetchChannelInfo retrieves the channel info from the YouTube URL.
 func fetchChannelInfo(youtubeUrl string) (*FeedInfo, error) {
 	resp, err := http.Get(youtubeUrl)
 	if err != nil {
@@ -308,7 +260,6 @@ func fetchChannelInfo(youtubeUrl string) (*FeedInfo, error) {
 	}, nil
 }
 
-// appendFeedToConfig updates the config file with the new feed.
 func appendFeedToConfig(configPath string, feed *FeedInfo, updatePeriod string, feedFormat string, cleanKeepLast int, maxAge int) error {
 	content, err := os.ReadFile(configPath)
 	if err != nil {
@@ -352,7 +303,6 @@ func appendFeedToConfig(configPath string, feed *FeedInfo, updatePeriod string, 
 	return os.WriteFile(configPath, newContent, 0644)
 }
 
-// sanitise creates a feed key from the channel name.
 func sanitise(name string) string {
 	var sb strings.Builder
 	for _, r := range name {
@@ -361,9 +311,4 @@ func sanitise(name string) string {
 		}
 	}
 	return strings.ToLower(sb.String())
-}
-
-func (h *Handler) HealthHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
