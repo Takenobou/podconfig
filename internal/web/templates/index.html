@@ -4,144 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Podconfig</title>
-    <style>
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-        font-family: monospace;
-      }
-      body {
-        background-color: #1f1f1f;
-        color: #f3f3f3;
-        padding: 1rem;
-      }
-      .container {
-        width: 90%;
-        max-width: 400px;
-        margin: 2rem auto;
-        padding: 1rem;
-        border: 1px dotted #444;
-      }
-      @media (max-width: 400px) {
-        .container {
-          margin-left: 10px;
-          margin-right: 10px;
-          width: auto;
-        }
-      }
-      .logo {
-        font-size: 1.5rem;
-        font-weight: bold;
-        margin-bottom: 1rem;
-        text-align: center;
-        cursor: pointer;
-      }
-      .logo .logo-part1 {
-        color: #ffffff;
-      }
-      .logo .logo-part2 {
-        color: #ff0000;
-      }
-      .logo:hover .logo-part1 {
-        color: #ff0000;
-      }
-      .logo:hover .logo-part2 {
-        color: #ffffff;
-      }
-      .message {
-        margin-bottom: 1rem;
-        padding: 0.5rem;
-        border: 1px dotted #444;
-        background-color: #2f2f2f;
-        font-weight: bold;
-      }
-      label {
-        display: block;
-        margin: 0.5rem 0 0.25rem;
-        font-weight: bold;
-      }
-      input[type="text"] {
-        width: 100%;
-        padding: 0.5rem;
-        background-color: #2f2f2f;
-        border: 1px dotted #444;
-        color: #f3f3f3;
-      }
-      button {
-        width: 100%;
-        margin-top: 0.5rem;
-        padding: 0.5rem;
-        border: 1px dotted #444;
-        background-color: #1f1f1f;
-        color: #f3f3f3;
-        cursor: pointer;
-        font-weight: bold;
-      }
-      .btn-add:hover {
-        background-color: #4caf50;
-      }
-      .btn-reload:hover {
-        background-color: #2196F3;
-      }
-      hr {
-        margin: 1.5rem 0;
-        border: none;
-        border-top: 1px dotted #444;
-      }
-
-      /* Feed list styling */
-      #feedListContainer {
-        margin-top: 1rem;
-      }
-      #feedListContainer h3 {
-        text-align: left;
-        margin-bottom: 0.5rem;
-        font-weight: bold;
-      }
-      .feed-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 0.5rem 0;
-        border-bottom: 1px dotted #444;
-      }
-      .feed-info {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-      }
-      .feed-name {
-        color: #fff;
-        text-decoration: none;
-        font-weight: bold;
-      }
-      .feed-name:hover {
-        text-decoration: underline;
-      }
-      .feed-xml {
-        font-size: 0.8rem;
-        color: #aaa;
-        cursor: pointer;
-      }
-      .feed-xml:hover {
-        color: #fff;
-        text-decoration: underline;
-      }
-      .btn-remove {
-        width: auto;
-        padding: 0.3rem 0.6rem;
-        border: 1px dotted #444;
-        background-color: #1f1f1f;
-        color: #f44336;
-        cursor: pointer;
-        font-weight: bold;
-      }
-      .btn-remove:hover {
-        background-color: #f44336;
-        color: #ffffff;
-      }
-    </style>
+    <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body>
     <div class="container">
@@ -156,6 +19,29 @@
       <form id="addFeedForm">
         <label for="youtubeUrl">YouTube URL</label>
         <input type="text" id="youtubeUrl" name="youtubeUrl" required />
+      
+        <p style="text-align: left; margin-top: 0.5rem;">
+          <a href="#" id="toggleAdvanced" style="color: #aaa; text-decoration: underline;">Advanced Options</a>
+        </p>
+      
+        <!-- Advanced configuration fields (hidden by default) -->
+        <div id="advancedOptions" style="display: none;">
+          <label for="update_period">Update Period (e.g. 1h, 12h)</label>
+          <input type="text" id="update_period" name="update_period" placeholder="1h" />
+      
+          <label for="format">Feed Format</label>
+          <select id="format" name="format">
+            <option value="video" selected>Video</option>
+            <option value="audio">Audio</option>
+          </select>
+      
+          <label for="max_age">Max Age (days)</label>
+          <input type="text" id="max_age" name="max_age" placeholder="90" />
+      
+          <label for="clean_keep_last">Keep Last Episodes</label>
+          <input type="text" id="clean_keep_last" name="clean_keep_last" placeholder="20" />
+        </div>
+      
         <button type="submit" id="addFeedBtn" class="btn-add">Add Feed</button>
       </form>
       <hr />
@@ -169,187 +55,13 @@
               <a href="{{ .URL }}" target="_blank" class="feed-name">{{ .Name }}</a>
               <span class="feed-xml" onclick="copyText(this, '{{ .XMLURL }}')">Copy XML path to clipboard</span>
             </div>
-            <button type="button" class="btn-remove" onclick="removeFeed(this, '{{ .Key }}')">Remove</button>
+            <button type="button" class="btn-remove" onclick="removeFeed(this, '{{ .Key }}')">Remove Feed</button>
           </div>
         {{ else }}
           <div class="message">No feeds found.</div>
         {{ end }}
       </div>
     </div>
-    <script>
-      // Function to copy text and temporarily change the element text
-      function copyText(el, text) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text)
-      .then(function() {
-        var originalText = el.innerHTML;
-        el.innerHTML = "Copied XML path to clipboard!";
-        setTimeout(function() {
-          el.innerHTML = originalText;
-        }, 1000);
-        console.log("Copied:", text);
-      })
-      .catch(function(err) {
-        console.error("Error copying text:", err);
-      });
-  } else {
-    var textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.style.position = "fixed";
-    textarea.style.top = 0;
-    textarea.style.left = 0;
-    document.body.appendChild(textarea);
-    textarea.focus();
-    textarea.select();
-    try {
-      var successful = document.execCommand("copy");
-      var originalText = el.innerHTML;
-      el.innerHTML = "Copied XML path to clipboard!";
-      setTimeout(function() {
-        el.innerHTML = originalText;
-      }, 1000);
-      console.log("Fallback: Copied text:", text);
-    } catch (err) {
-      console.error("Fallback: Unable to copy", err);
-    }
-    document.body.removeChild(textarea);
-  }
-}
-      
-      // Refresh the feed list from the /feeds endpoint.
-      function refreshFeedList() {
-        fetch("/feeds", {
-          method: "GET",
-          headers: { "X-Requested-With": "XMLHttpRequest" }
-        })
-        .then(response => response.json())
-        .then(feeds => {
-          var container = document.getElementById("feedListContainer");
-          var html = "<h3>Feeds</h3>";
-          if (feeds.length === 0) {
-            html += '<div class="message">No feeds found.</div>';
-          } else {
-            feeds.forEach(function(feed) {
-              html += `
-  <div class="feed-item">
-    <div class="feed-info">
-      <a href="${feed.URL}" target="_blank" class="feed-name">${feed.Name}</a>
-      <span class="feed-xml" onclick="copyText(this, '${feed.XMLURL}')">Copy XML path to clipboard</span>
-    </div>
-    <button type="button" class="btn-remove" onclick="removeFeed(this, '${feed.Key}')">Remove Feed</button>
-  </div>
-              `;
-            });
-          }
-          container.innerHTML = html;
-        })
-        .catch(error => {
-          console.error("Error refreshing feed list:", error);
-          document.getElementById("feedListContainer").innerHTML =
-            '<div class="message">Error loading feed list.</div>';
-        });
-      }
-      
-      // Refresh feed list on page load.
-      refreshFeedList();
-      
-      // Handle reload button via AJAX.
-      document.getElementById("reloadBtn").addEventListener("click", function() {
-        var btn = this;
-        btn.disabled = true;
-        var originalText = btn.textContent;
-        btn.textContent = "Reloading…";
-        fetch("/reload", {
-          method: "POST",
-          headers: { "X-Requested-With": "XMLHttpRequest" }
-        })
-        .then(response => response.json())
-        .then(data => {
-          document.getElementById("messageContainer").innerHTML =
-            '<div class="message">' + data.message + '</div>';
-          btn.disabled = false;
-          btn.textContent = originalText;
-          refreshFeedList();
-        })
-        .catch(error => {
-          document.getElementById("messageContainer").innerHTML =
-            '<div class="message">Error reloading container.</div>';
-          console.error("Error reloading container:", error);
-          btn.disabled = false;
-          btn.textContent = originalText;
-        });
-      });
-      
-      // Handle add feed form via AJAX.
-      document.getElementById("addFeedForm").addEventListener("submit", function(event) {
-        event.preventDefault();
-        var btn = document.getElementById("addFeedBtn");
-        btn.disabled = true;
-        var originalText = btn.textContent;
-        btn.textContent = "Adding Feed…";
-        var youtubeUrl = document.getElementById("youtubeUrl").value;
-        var formData = new URLSearchParams();
-        formData.append("youtubeUrl", youtubeUrl);
-        fetch("/add", {
-          method: "POST",
-          headers: { 
-            "X-Requested-With": "XMLHttpRequest", 
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
-          body: formData.toString()
-        })
-        .then(response => response.json())
-        .then(data => {
-          document.getElementById("messageContainer").innerHTML =
-            '<div class="message">' + data.message + '</div>';
-          btn.disabled = false;
-          btn.textContent = originalText;
-          document.getElementById("youtubeUrl").value = "";
-          refreshFeedList();
-        })
-        .catch(error => {
-          document.getElementById("messageContainer").innerHTML =
-            '<div class="message">Error adding feed.</div>';
-          console.error("Error adding feed:", error);
-          btn.disabled = false;
-          btn.textContent = originalText;
-        });
-      });
-      
-      function removeFeed(button, feedKey) {
-
-        if (button.innerHTML.trim() !== 'Confirm Remove' && button.innerHTML.trim() !== 'Remove Feed') {
-        }
-        if (button.innerHTML.trim() !== 'Confirm Remove') {
-          var originalText = button.innerHTML;
-          button.innerHTML = 'Confirm Remove';
-          setTimeout(function() {
-            if (button.innerHTML.trim() === 'Confirm Remove') {
-              button.innerHTML = originalText;
-            }
-          }, 3000);
-          return;
-        }
-        fetch('/remove', {
-          method: 'POST',
-          headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: 'feedKey=' + encodeURIComponent(feedKey)
-        })
-        .then(response => response.json())
-        .then(data => {
-          document.getElementById('messageContainer').innerHTML =
-            '<div class="message">' + data.message + '</div>';
-          refreshFeedList();
-        })
-        .catch(error => {
-          console.error('Error removing feed:', error);
-          document.getElementById('messageContainer').innerHTML =
-            '<div class="message">Error removing feed.</div>';
-        });
-      }
-    </script>
+    <script src="/static/script.js"></script>
   </body>
 </html>

@@ -22,7 +22,7 @@ func main() {
 	}
 
 	port := cfg.ServerPort
-
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("internal/web/static"))))
 	http.HandleFunc("/", handler.Index)
 	http.HandleFunc("/add", handler.AddFeedHandler)
 	http.HandleFunc("/reload", handler.ReloadHandler)

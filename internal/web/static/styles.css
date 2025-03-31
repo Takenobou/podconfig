@@ -1,0 +1,136 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: monospace;
+  }
+  body {
+    background-color: #1f1f1f;
+    color: #f3f3f3;
+    padding: 1rem;
+  }
+  .container {
+    width: 90%;
+    max-width: 400px;
+    margin: 2rem auto;
+    padding: 1rem;
+    border: 1px dotted #444;
+  }
+  @media (max-width: 400px) {
+    .container {
+      margin-left: 10px;
+      margin-right: 10px;
+      width: auto;
+    }
+  }
+  .logo {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    text-align: center;
+    cursor: pointer;
+  }
+  .logo .logo-part1 {
+    color: #ffffff;
+  }
+  .logo .logo-part2 {
+    color: #ff0000;
+  }
+  .logo:hover .logo-part1 {
+    color: #ff0000;
+  }
+  .logo:hover .logo-part2 {
+    color: #ffffff;
+  }
+  .message {
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    border: 1px dotted #444;
+    background-color: #2f2f2f;
+    font-weight: bold;
+  }
+  label {
+    display: block;
+    margin: 0.5rem 0 0.25rem;
+    font-weight: bold;
+  }
+  input[type="text"],
+  select {
+    width: 100%;
+    padding: 0.5rem;
+    background-color: #2f2f2f;
+    border: 1px dotted #444;
+    color: #f3f3f3;
+  }
+  button {
+    width: 100%;
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    border: 1px dotted #444;
+    background-color: #1f1f1f;
+    color: #f3f3f3;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  .btn-add:hover {
+    background-color: #4caf50;
+  }
+  .btn-reload:hover {
+    background-color: #2196F3;
+  }
+  hr {
+    margin: 1.5rem 0;
+    border: none;
+    border-top: 1px dotted #444;
+  }
+  /* Feed list styling */
+  #feedListContainer {
+    margin-top: 1rem;
+  }
+  #feedListContainer h3 {
+    text-align: left;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+  }
+  .feed-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px dotted #444;
+  }
+  .feed-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .feed-name {
+    color: #fff;
+    text-decoration: none;
+    font-weight: bold;
+  }
+  .feed-name:hover {
+    text-decoration: underline;
+  }
+  .feed-xml {
+    font-size: 0.8rem;
+    color: #aaa;
+    cursor: pointer;
+  }
+  .feed-xml:hover {
+    color: #fff;
+    text-decoration: underline;
+  }
+  .btn-remove {
+    width: auto;
+    padding: 0.3rem 0.6rem;
+    border: 1px dotted #444;
+    background-color: #1f1f1f;
+    color: #f44336;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  .btn-remove:hover {
+    background-color: #f44336;
+    color: #ffffff;
+  }

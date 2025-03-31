@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -60,13 +61,36 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "YouTube URL is required", http.StatusBadRequest)
 		return
 	}
+	// Read additional optional configuration values
+	updatePeriod := r.FormValue("update_period")
+	if updatePeriod == "" {
+		updatePeriod = "1h"
+	}
+	feedFormat := r.FormValue("format")
+	if feedFormat == "" {
+		feedFormat = "video"
+	}
+	cleanKeepLastStr := r.FormValue("clean_keep_last")
+	cleanKeepLast := 20
+	if cleanKeepLastStr != "" {
+		if v, err := strconv.Atoi(cleanKeepLastStr); err == nil {
+			cleanKeepLast = v
+		}
+	}
+	maxAgeStr := r.FormValue("max_age")
+	maxAge := 90
+	if maxAgeStr != "" {
+		if v, err := strconv.Atoi(maxAgeStr); err == nil {
+			maxAge = v
+		}
+	}
 	feed, err := fetchChannelInfo(youtubeUrl)
 	if err != nil {
 		log.Printf("Error fetching channel info: %v", err)
 		http.Error(w, "Failed to fetch channel info", http.StatusInternalServerError)
 		return
 	}
-	err = appendFeedToConfig(h.PodsyncConfigPath, feed)
+	err = appendFeedToConfig(h.PodsyncConfigPath, feed, updatePeriod, feedFormat, cleanKeepLast, maxAge)
 	if err != nil {
 		log.Printf("Error updating config: %v", err)
 		http.Error(w, "Failed to update config", http.StatusInternalServerError)
@@ -288,7 +312,7 @@ func fetchChannelInfo(youtubeUrl string) (*FeedInfo, error) {
 }
 
 // appendFeedToConfig updates the config file with the new feed.
-func appendFeedToConfig(configPath string, feed *FeedInfo) error {
+func appendFeedToConfig(configPath string, feed *FeedInfo, updatePeriod string, feedFormat string, cleanKeepLast int, maxAge int) error {
 	content, err := os.ReadFile(configPath)
 	if err != nil {
 		return err
@@ -306,24 +330,21 @@ func appendFeedToConfig(configPath string, feed *FeedInfo) error {
 	newFeed := map[string]interface{}{
 		"url":             feed.URL,
 		"page_size":       50,
-		"update_period":   "1h",
+		"update_period":   updatePeriod,
 		"quality":         "high",
-		"format":          "video",
+		"format":          feedFormat,
 		"opml":            true,
-		"cron_schedule":   "@every 1h",
 		"private_feed":    false,
 		"youtube_dl_args": []string{"--add-metadata", "--embed-thumbnail", "--write-description"},
-		"clean":           map[string]interface{}{"keep_last": 20},
-		"filters":         map[string]interface{}{"max_age": 90},
+		"clean":           map[string]interface{}{"keep_last": cleanKeepLast},
+		"filters":         map[string]interface{}{"max_age": maxAge},
 		"custom": map[string]interface{}{
-			"title":         feed.ChannelName,
-			"description":   "Episodes from the '" + feed.ChannelName + "' Youtube channel in a podcast format.",
-			"author":        feed.ChannelName,
-			"cover_art":     feed.ProfilePicture,
-			"lang":          "en",
-			"category":      "Entertainment",
-			"subcategories": []string{"Commentary"},
-			"explicit":      false,
+			"title":       feed.ChannelName,
+			"description": "Episodes from the '" + feed.ChannelName + "' Youtube channel in a podcast format.",
+			"author":      feed.ChannelName,
+			"cover_art":   feed.ProfilePicture,
+			"lang":        "en",
+			"explicit":    false,
 		},
 	}
 	feeds[feed.FeedKey] = newFeed
