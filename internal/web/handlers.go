@@ -18,9 +18,6 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-//go:embed templates/index.html
-var indexHTML string
-
 var tmpl = template.Must(template.New("index").Parse(indexHTML))
 
 type FeedInfo struct {
