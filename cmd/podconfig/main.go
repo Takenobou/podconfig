@@ -28,6 +28,7 @@ func main() {
 	http.HandleFunc("/reload", handler.ReloadHandler)
 	http.HandleFunc("/feeds", handler.FeedListHandler)
 	http.HandleFunc("/remove", handler.RemoveFeedHandler)
+	http.HandleFunc("/health", handler.HealthHandler)
 
 	server := &http.Server{
 		Addr: ":" + port,
