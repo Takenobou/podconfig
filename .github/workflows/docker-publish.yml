@@ -11,7 +11,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  REPO_NAME_LOWER: ${{ github.repository | toLower() }}
 
 jobs:
   build:
@@ -19,7 +19,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write   # for cosign OIDC-based signing
+      id-token: write
 
     steps:
       - name: Checkout repository
@@ -46,7 +46,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.REPO_NAME_LOWER }}
 
       - name: Build and push Docker image
         id: build-and-push
@@ -54,10 +54,9 @@ jobs:
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
-          # IMPORTANT: Add :latest explicitly, while preserving any tags from metadata.
           tags: |
             ${{ steps.meta.outputs.tags }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.REPO_NAME_LOWER }}:latest
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -65,8 +64,7 @@ jobs:
       - name: Sign the published Docker image
         if: ${{ github.event_name != 'pull_request' }}
         env:
-          # Combine the auto-generated tags with :latest for signing
-          TAGS: ${{ steps.meta.outputs.tags }} ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          TAGS: ${{ steps.meta.outputs.tags }} ${{ env.REGISTRY }}/${{ env.REPO_NAME_LOWER }}:latest
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: |
           echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
