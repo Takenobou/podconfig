@@ -7,18 +7,31 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sort"
 	"strconv"
-	"strings"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/pelletier/go-toml/v2"
 )
 
-var tmpl = template.Must(template.New("index").Parse(indexHTML))
+var fs = &FeedService{}
+var tmpl = template.Must(template.New("index").Funcs(template.FuncMap{
+	"dict": func(values ...interface{}) (map[string]interface{}, error) {
+		if len(values)%2 != 0 {
+			return nil, fmt.Errorf("dict expects an even number of arguments")
+		}
+		dict := make(map[string]interface{}, len(values)/2)
+		for i := 0; i < len(values); i += 2 {
+			key, ok := values[i].(string)
+			if !ok {
+				return nil, fmt.Errorf("dict keys must be strings")
+			}
+			dict[key] = values[i+1]
+		}
+		return dict, nil
+	},
+}).Parse(indexHTML))
 
-// FeedInfo holds information about a feed.
-type FeedInfo struct {
+// NewFeedInfo holds information about a feed.
+type NewFeedInfo struct {
 	FeedKey        string
 	URL            string
 	ChannelName    string
@@ -27,15 +40,19 @@ type FeedInfo struct {
 
 // FeedListItem represents an entry in the feed list.
 type FeedListItem struct {
-	Key    string
-	Name   string
-	URL    string
-	XMLURL string
+	Key           string
+	Name          string
+	URL           string
+	XMLURL        string
+	UpdatePeriod  string
+	Format        string
+	MaxAge        string
+	CleanKeepLast string
 }
 
 // Index handles the main page rendering.
 func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
-	feedList, err := getFeedList(h.PodsyncConfigPath)
+	feedList, err := fs.GetFeedList(h.PodsyncConfigPath)
 	if err != nil {
 		log.Printf("Error reading feed list: %v", err)
 		feedList = []FeedListItem{}
@@ -80,13 +97,13 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 			maxAge = v
 		}
 	}
-	feed, err := fetchChannelInfo(youtubeUrl)
+	feed, err := fs.FetchChannelInfo(youtubeUrl)
 	if err != nil {
 		log.Printf("Error fetching channel info: %v", err)
 		http.Error(w, "Failed to fetch channel info", http.StatusInternalServerError)
 		return
 	}
-	err = appendFeedToConfig(h.PodsyncConfigPath, feed, updatePeriod, feedFormat, cleanKeepLast, maxAge)
+	err = fs.AppendFeedToConfig(h.PodsyncConfigPath, feed, updatePeriod, feedFormat, cleanKeepLast, maxAge)
 	if err != nil {
 		log.Printf("Error updating config: %v", err)
 		http.Error(w, "Failed to update config", http.StatusInternalServerError)
@@ -165,150 +182,62 @@ func (h *Handler) RemoveFeedHandler(w http.ResponseWriter, r *http.Request) {
 
 // FeedListHandler returns the list of feeds in JSON.
 func (h *Handler) FeedListHandler(w http.ResponseWriter, r *http.Request) {
-	feedList, err := getFeedList(h.PodsyncConfigPath)
+	feedList, err := fs.GetFeedList(h.PodsyncConfigPath)
 	if err != nil {
 		http.Error(w, "Failed to load feed list", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(feedList)
+	data := map[string]interface{}{
+		"Feeds": feedList,
+	}
+	w.Header().Set("Content-Type", "text/html")
+	if err := tmpl.ExecuteTemplate(w, "feedList", data); err != nil {
+		http.Error(w, "Template error", http.StatusInternalServerError)
+	}
 }
 
-func getFeedList(configPath string) ([]FeedListItem, error) {
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, err
+// ModifyFeedHandler handles updating an existing feed.
+func (h *Handler) ModifyFeedHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
 	}
-	var config map[string]interface{}
-	err = toml.Unmarshal(content, &config)
-	if err != nil {
-		return nil, err
+	feedKey := r.FormValue("feedKey")
+	if feedKey == "" {
+		http.Error(w, "feedKey is required", http.StatusBadRequest)
+		return
 	}
-	feeds, ok := config["feeds"].(map[string]interface{})
-	if !ok {
-		return []FeedListItem{}, nil
+	updates := make(map[string]interface{})
+	if updatePeriod := r.FormValue("update_period"); updatePeriod != "" {
+		updates["update_period"] = updatePeriod
 	}
-	var hostname string
-	if serverSection, ok := config["server"].(map[string]interface{}); ok {
-		hostname, _ = serverSection["hostname"].(string)
+	if feedFormat := r.FormValue("format"); feedFormat != "" {
+		updates["format"] = feedFormat
 	}
-	feedList := make([]FeedListItem, 0, len(feeds))
-	for key, v := range feeds {
-		entry, ok := v.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		name := key
-		if custom, ok := entry["custom"].(map[string]interface{}); ok {
-			if t, ok := custom["title"].(string); ok && t != "" {
-				name = t
-			}
-		}
-		urlVal, _ := entry["url"].(string)
-		xmlURL := ""
-		if hostname != "" {
-			xmlURL = strings.TrimRight(hostname, "/") + "/" + key + ".xml"
-		}
-		feedList = append(feedList, FeedListItem{
-			Key:    key,
-			Name:   name,
-			URL:    urlVal,
-			XMLURL: xmlURL,
-		})
-	}
-	sort.Slice(feedList, func(i, j int) bool {
-		return feedList[i].Name < feedList[j].Name
-	})
-	return feedList, nil
-}
-
-func fetchChannelInfo(youtubeUrl string) (*FeedInfo, error) {
-	resp, err := http.Get(youtubeUrl)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP status %d", resp.StatusCode)
-	}
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	canonical, exists := doc.Find("link[rel='canonical']").Attr("href")
-	if !exists || canonical == "" {
-		return nil, fmt.Errorf("canonical link not found")
-	}
-	if !strings.Contains(canonical, "/channel/") {
-		channelId, exists := doc.Find("meta[itemprop='channelId']").Attr("content")
-		if !exists || channelId == "" {
-			return nil, fmt.Errorf("channel id not found")
-		}
-		canonical = "https://www.youtube.com/channel/" + channelId
-	}
-	channelName, exists := doc.Find("meta[property='og:title']").Attr("content")
-	if !exists || channelName == "" {
-		channelName = "Unknown Channel"
-	}
-	profilePic, _ := doc.Find("meta[property='og:image']").Attr("content")
-	feedKey := sanitise(channelName)
-	return &FeedInfo{
-		FeedKey:        feedKey,
-		URL:            canonical,
-		ChannelName:    channelName,
-		ProfilePicture: profilePic,
-	}, nil
-}
-
-func appendFeedToConfig(configPath string, feed *FeedInfo, updatePeriod string, feedFormat string, cleanKeepLast int, maxAge int) error {
-	content, err := os.ReadFile(configPath)
-	if err != nil {
-		return err
-	}
-	var config map[string]interface{}
-	err = toml.Unmarshal(content, &config)
-	if err != nil {
-		return err
-	}
-	feeds, ok := config["feeds"].(map[string]interface{})
-	if !ok {
-		feeds = make(map[string]interface{})
-		config["feeds"] = feeds
-	}
-	newFeed := map[string]interface{}{
-		"url":             feed.URL,
-		"page_size":       50,
-		"update_period":   updatePeriod,
-		"quality":         "high",
-		"format":          feedFormat,
-		"opml":            true,
-		"private_feed":    false,
-		"youtube_dl_args": []string{"--add-metadata", "--embed-thumbnail", "--write-description"},
-		"clean":           map[string]interface{}{"keep_last": cleanKeepLast},
-		"filters":         map[string]interface{}{"max_age": maxAge},
-		"custom": map[string]interface{}{
-			"title":       feed.ChannelName,
-			"description": "Episodes from the '" + feed.ChannelName + "' Youtube channel in a podcast format.",
-			"author":      feed.ChannelName,
-			"cover_art":   feed.ProfilePicture,
-			"lang":        "en",
-			"explicit":    false,
-		},
-	}
-	feeds[feed.FeedKey] = newFeed
-	newContent, err := toml.Marshal(config)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(configPath, newContent, 0644)
-}
-
-func sanitise(name string) string {
-	var sb strings.Builder
-	for _, r := range name {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
-			sb.WriteRune(r)
+	if cleanKeepLastStr := r.FormValue("clean_keep_last"); cleanKeepLastStr != "" {
+		if v, err := strconv.Atoi(cleanKeepLastStr); err == nil {
+			updates["clean"] = map[string]interface{}{"keep_last": v}
 		}
 	}
-	return strings.ToLower(sb.String())
+	if maxAgeStr := r.FormValue("max_age"); maxAgeStr != "" {
+		if v, err := strconv.Atoi(maxAgeStr); err == nil {
+			updates["filters"] = map[string]interface{}{"max_age": v}
+		}
+	}
+	err := fs.ModifyFeed(h.PodsyncConfigPath, feedKey, updates)
+	if err != nil {
+		log.Printf("Error modifying feed: %v", err)
+		http.Error(w, "Failed to modify feed", http.StatusInternalServerError)
+		return
+	}
+	successMsg := fmt.Sprintf("Feed '%s' modified successfully! Reload the docker container to update Podsync.", feedKey)
+	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": successMsg})
+		return
+	}
+	data := map[string]interface{}{
+		"Message": successMsg,
+	}
+	tmpl.Execute(w, data)
 }

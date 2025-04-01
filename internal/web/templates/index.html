@@ -1,67 +1,153 @@
+{{ define "feedList" }}
+<div id="feedListContainer">
+  <h3>Feeds</h3>
+  {{ if .Feeds }}
+    {{ range .Feeds }}
+      {{ template "feedItem" . }}
+    {{ end }}
+  {{ else }}
+    <div class="message">No feeds found.</div>
+  {{ end }}
+</div>
+{{ end }}
+
+{{ define "layout" }}
 <!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Podconfig</title>
+    <title>{{ block "title" . }}Podconfig{{ end }}</title>
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body>
     <div class="container">
-      <h2 class="logo">
-        <span class="logo-part1">Pod</span><span class="logo-part2">config</span>
-      </h2>
-      <div id="messageContainer">
-        {{ if .Message }}
-          <div class="message">{{ .Message }}</div>
-        {{ end }}
-      </div>
-      <form id="addFeedForm">
-        <label for="youtubeUrl">YouTube URL</label>
-        <input type="text" id="youtubeUrl" name="youtubeUrl" required />
-      
-        <p style="text-align: left; margin-top: 0.5rem;">
-          <a href="#" id="toggleAdvanced" style="color: #aaa; text-decoration: underline;">Advanced Options</a>
-        </p>
-      
-        <!-- Advanced configuration fields (hidden by default) -->
-        <div id="advancedOptions" style="display: none;">
-          <label for="update_period">Update Period (e.g. 1h, 12h)</label>
-          <input type="text" id="update_period" name="update_period" placeholder="1h" />
-      
-          <label for="format">Feed Format</label>
-          <select id="format" name="format">
-            <option value="video" selected>Video</option>
-            <option value="audio">Audio</option>
-          </select>
-      
-          <label for="max_age">Max Age (days)</label>
-          <input type="text" id="max_age" name="max_age" placeholder="90" />
-      
-          <label for="clean_keep_last">Keep Last Episodes</label>
-          <input type="text" id="clean_keep_last" name="clean_keep_last" placeholder="20" />
-        </div>
-      
-        <button type="submit" id="addFeedBtn" class="btn-add">Add Feed</button>
-      </form>
-      <hr />
-      <button type="button" id="reloadBtn" class="btn-reload">Reload Podsync Docker Container</button>
-      <hr />
-      <div id="feedListContainer">
-        <h3>Feeds</h3>
-        {{ range .Feeds }}
-          <div class="feed-item">
-            <div class="feed-info">
-              <a href="{{ .URL }}" target="_blank" class="feed-name">{{ .Name }}</a>
-              <span class="feed-xml" onclick="copyText(this, '{{ .XMLURL }}')">Copy XML path to clipboard</span>
-            </div>
-            <button type="button" class="btn-remove" onclick="removeFeed(this, '{{ .Key }}')">Remove Feed</button>
-          </div>
-        {{ else }}
-          <div class="message">No feeds found.</div>
-        {{ end }}
-      </div>
+      {{ block "content" . }}{{ end }}
     </div>
     <script src="/static/script.js"></script>
   </body>
 </html>
+{{ end }}
+
+{{ define "commonFields" }}
+<label for="{{ .Prefix }}update_period">Feed Update Frequency</label>
+<input type="text"
+       id="{{ .Prefix }}update_period"
+       placeholder="1h"
+       value="{{ .UpdatePeriod }}"
+       data-original="{{ .UpdatePeriod }}" />
+
+<label for="{{ .Prefix }}format">Feed Format</label>
+<select id="{{ .Prefix }}format" data-original="{{ .Format }}">
+  <option value="video" {{ if eq .Format "video" }}selected{{ end }}>Video</option>
+  <option value="audio" {{ if eq .Format "audio" }}selected{{ end }}>Audio</option>
+</select>
+
+<label for="{{ .Prefix }}max_age">Max Episode Age</label>
+<input type="text"
+       id="{{ .Prefix }}max_age"
+       placeholder="90"
+       value="{{ .MaxAge }}"
+       data-original="{{ .MaxAge }}" />
+
+<label for="{{ .Prefix }}clean_keep_last">Max Episode Amount</label>
+<input type="text"
+       id="{{ .Prefix }}clean_keep_last"
+       placeholder="20"
+       value="{{ .CleanKeepLast }}"
+       data-original="{{ .CleanKeepLast }}" />
+{{ end }}
+
+{{ define "addFeedAdvancedFields" }}
+<!-- Advanced options for adding a new feed (no existing settings) -->
+<div id="advancedOptions" style="display: none;">
+  {{ template "commonFields" (dict "Prefix" "" ) }}
+</div>
+{{ end }}
+
+{{ define "editFeedFields" }}
+<!-- The edit form for an existing feed. Fields have data-original, and Save Edit is disabled initially. -->
+{{ template "commonFields" (dict 
+  "Prefix" (print .Key "-") 
+  "UpdatePeriod" .UpdatePeriod 
+  "Format" .Format 
+  "MaxAge" .MaxAge 
+  "CleanKeepLast" .CleanKeepLast
+) }}
+<div class="edit-buttons" style="margin-top: 0.5rem;">
+  <button type="button"
+          class="btn-confirm"
+          data-role="save-edit"
+          data-feedkey="{{ .Key }}"
+          disabled>
+    Save Edit
+  </button>
+  <button type="button"
+          class="btn-remove"
+          data-role="remove-feed"
+          data-feedkey="{{ .Key }}">
+    Remove Feed
+  </button>
+</div>
+{{ end }}
+
+{{ define "feedItem" }}
+<div class="feed-item" id="feed-item-{{ .Key }}">
+  <div class="feed-top">
+    <div class="feed-info">
+      <a href="{{ .URL }}" target="_blank" class="feed-name">{{ .Name }}</a>
+      <span class="feed-xml" data-role="xml-button" data-xmlurl="{{ .XMLURL }}">
+        Copy XML path to clipboard
+      </span>
+    </div>
+    <button type="button"
+            class="btn-edit"
+            data-role="edit-button"
+            data-feedkey="{{ .Key }}">
+      Edit Feed
+    </button>
+  </div>
+  <div class="edit-form" id="edit-form-{{ .Key }}" style="display: none; margin-top: 1rem;">
+    {{ template "editFeedFields" . }}
+  </div>
+</div>
+{{ end }}
+
+{{ define "index" }}
+{{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<h2 class="logo">
+  <span class="logo-part1">Pod</span><span class="logo-part2">config</span>
+</h2>
+
+<div id="messageContainer">
+  {{ if .Message }}
+    <div class="message">{{ .Message }}</div>
+  {{ end }}
+</div>
+
+<form id="addFeedForm">
+  <label for="youtubeUrl">YouTube URL</label>
+  <input type="text" id="youtubeUrl" name="youtubeUrl" required />
+
+  <p style="text-align: left; margin-top: 0.5rem;">
+    <a href="#" id="toggleAdvanced" style="color: #aaa; text-decoration: underline;">
+      Advanced Options
+    </a>
+  </p>
+
+  {{ template "addFeedAdvancedFields" . }}
+
+  <button type="submit" id="addFeedBtn" class="btn-add">Add Feed</button>
+</form>
+
+<hr />
+<button type="button" id="reloadBtn" class="btn-reload">Reload Podsync Docker Container</button>
+<hr />
+
+<div id="feedListWrapper">
+  {{ template "feedList" . }}
+</div>
+{{ end }}
