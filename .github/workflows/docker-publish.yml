@@ -72,4 +72,6 @@ jobs:
           TAGS: ${{ steps.meta.outputs.tags }} ${{ env.REGISTRY }}/${{ env.REPO_NAME_LOWER }}:latest
           DIGEST: ${{ steps.build-and-push.outputs.digest }}
         run: |
-          echo "${TAGS}" | xargs -I {} cosign sign --yes {}@${DIGEST}
+          for ref in ${TAGS}; do
+            cosign sign --yes "${ref}@${DIGEST}"
+          done
