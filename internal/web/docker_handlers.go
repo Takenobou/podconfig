@@ -19,7 +19,6 @@ func (h *Handler) ReloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create a Docker client using environment variables (ensure DOCKER_HOST, DOCKER_CERT_PATH, etc. are set if needed).
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		log.Printf("Error creating Docker client: %v", err)
@@ -27,11 +26,8 @@ func (h *Handler) ReloadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set a timeout for the container restart operation.
 	timeout := 10 * time.Second
 	ctx := context.Background()
-
-	// Restart the container with the specified timeout.
 	intTimeout := int(timeout.Seconds())
 	err = cli.ContainerRestart(ctx, h.DockerContainerName, container.StopOptions{Timeout: &intTimeout})
 	if err != nil {
@@ -39,6 +35,8 @@ func (h *Handler) ReloadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to reload docker container", http.StatusInternalServerError)
 		return
 	}
+
+	h.clearChanges()
 
 	successMsg := fmt.Sprintf("Docker container '%s' reloaded successfully!", h.DockerContainerName)
 	log.Printf("Reload successful: %s", successMsg)

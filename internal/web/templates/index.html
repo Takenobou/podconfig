@@ -145,9 +145,23 @@
 
 <hr />
 <button type="button" id="reloadBtn" class="btn-reload">Reload Podsync Docker Container</button>
+<div id="changelogWrapper"></div>
 <hr />
 
 <div id="feedListWrapper">
   {{ template "feedList" . }}
+</div>
+{{ end }}
+
+{{ define "changelogOnly" }}
+<div class="changelog-container">
+  <div class="changelog-heading">Changes Pending Reload:</div>
+  {{ if .PendingChanges }}
+    {{ range .PendingChanges }}
+      <div class="changelog-message"><i>{{ . }}</i></div>
+    {{ end }}
+  {{ else }}
+    <div class="changelog-message"><i>No pending changes.</i></div>
+  {{ end }}
 </div>
 {{ end }}

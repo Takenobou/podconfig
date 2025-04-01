@@ -207,4 +207,22 @@ button.btn-remove:hover {
 .btn-confirm:disabled:hover {
     background-color: #888 !important;
     cursor: not-allowed;
-  }
+}
+
+.changelog-container {
+    margin-top: 0.5rem;
+    color: #aaa;
+    font-size: 0.8rem;
+}
+
+.changelog-heading {
+    font-weight: bold;
+    margin-bottom: 0.3rem;
+    color: #aaa;
+    font-size: 0.8rem;
+}
+
+.changelog-message {
+    margin: 0.15rem 0;
+    font-style: italic;
+}

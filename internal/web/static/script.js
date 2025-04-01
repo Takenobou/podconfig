@@ -161,7 +161,7 @@ document.getElementById("toggleAdvanced").addEventListener("click", function(e) 
     var btn = this;
     btn.disabled = true;
     var originalText = btn.textContent;
-    btn.textContent = "Reloading…";
+    btn.textContent = "Reloading Container…";
     fetch("/reload", {
       method: "POST",
       headers: { "X-Requested-With": "XMLHttpRequest" }
@@ -173,6 +173,7 @@ document.getElementById("toggleAdvanced").addEventListener("click", function(e) 
         btn.disabled = false;
         btn.textContent = originalText;
         refreshFeedList();
+        refreshChangelog();
       })
       .catch(error => {
         document.getElementById("messageContainer").innerHTML =
@@ -227,6 +228,7 @@ document.getElementById("toggleAdvanced").addEventListener("click", function(e) 
         adv.style.display = "none";
         document.getElementById("toggleAdvanced").textContent = "Advanced Options";
         refreshFeedList();
+        refreshChangelog();
       })
       .catch(error => {
         console.error("Error adding feed:", error);
@@ -262,6 +264,7 @@ document.getElementById("toggleAdvanced").addEventListener("click", function(e) 
         document.getElementById("messageContainer").innerHTML =
           '<div class="message">' + data.message + '</div>';
         refreshFeedList();
+        refreshChangelog();
       })
       .catch(error => {
         console.error("Error removing feed:", error);
@@ -315,10 +318,26 @@ document.getElementById("toggleAdvanced").addEventListener("click", function(e) 
         if (editButton) editButton.textContent = "Edit Feed";
   
         refreshFeedList();
+        refreshChangelog();
       })
       .catch(error => {
         console.error("Error modifying feed:", error);
         document.getElementById("messageContainer").innerHTML =
           '<div class="message">Error modifying feed.</div>';
+      });
+  }
+
+  function refreshChangelog() {
+    fetch("/changelog", {
+      method: "GET",
+      headers: { "X-Requested-With": "XMLHttpRequest" }
+    })
+      .then(response => response.text())
+      .then(html => {
+        document.getElementById("changelogWrapper").innerHTML = html;
+      })
+      .catch(error => {
+        console.error("Error refreshing changelog:", error);
+        document.getElementById("changelogWrapper").innerHTML = "";
       });
   }

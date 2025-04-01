@@ -58,8 +58,9 @@ func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 		feedList = []FeedListItem{}
 	}
 	data := map[string]interface{}{
-		"Message": r.URL.Query().Get("message"),
-		"Feeds":   feedList,
+		"Message":        r.URL.Query().Get("message"),
+		"Feeds":          feedList,
+		"PendingChanges": h.getChanges(), // pass the pending changes to the template
 	}
 	if err := tmpl.Execute(w, data); err != nil {
 		log.Printf("Error executing template: %v", err)
@@ -109,7 +110,10 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to update config", http.StatusInternalServerError)
 		return
 	}
-	successMsg := fmt.Sprintf("Feed for channel '%s' added successfully! Reload the docker container to update Podsync.", feed.ChannelName)
+
+	h.addChange(fmt.Sprintf("Added feed '%s'", feed.FeedKey))
+
+	successMsg := fmt.Sprintf("Feed for channel '%s' added successfully!", feed.ChannelName)
 	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"message": successMsg})
@@ -168,7 +172,10 @@ func (h *Handler) RemoveFeedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to write config", http.StatusInternalServerError)
 		return
 	}
-	successMsg := fmt.Sprintf("Feed for channel '%s' removed successfully! Reload the docker container to update Podsync.", feedKey)
+
+	h.addChange(fmt.Sprintf("Removed feed '%s'", feedKey))
+
+	successMsg := fmt.Sprintf("Feed for channel '%s' removed successfully!", feedKey)
 	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"message": successMsg})
@@ -180,7 +187,7 @@ func (h *Handler) RemoveFeedHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(w, data)
 }
 
-// FeedListHandler returns the list of feeds in JSON.
+// FeedListHandler returns the list of feeds in HTML (partial).
 func (h *Handler) FeedListHandler(w http.ResponseWriter, r *http.Request) {
 	feedList, err := fs.GetFeedList(h.PodsyncConfigPath)
 	if err != nil {
@@ -230,7 +237,10 @@ func (h *Handler) ModifyFeedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to modify feed", http.StatusInternalServerError)
 		return
 	}
-	successMsg := fmt.Sprintf("Feed '%s' modified successfully! Reload the docker container to update Podsync.", feedKey)
+
+	h.addChange(fmt.Sprintf("Modified feed '%s'", feedKey))
+
+	successMsg := fmt.Sprintf("Feed '%s' modified successfully!.", feedKey)
 	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{"message": successMsg})
@@ -240,4 +250,19 @@ func (h *Handler) ModifyFeedHandler(w http.ResponseWriter, r *http.Request) {
 		"Message": successMsg,
 	}
 	tmpl.Execute(w, data)
+}
+
+// ChangelogHandler returns the minimal changelog partial
+func (h *Handler) ChangelogHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	data := map[string]interface{}{
+		"PendingChanges": h.getChanges(),
+	}
+	w.Header().Set("Content-Type", "text/html")
+	if err := tmpl.ExecuteTemplate(w, "changelogOnly", data); err != nil {
+		http.Error(w, "Template error", http.StatusInternalServerError)
+	}
 }

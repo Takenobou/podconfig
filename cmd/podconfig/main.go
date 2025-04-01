@@ -29,6 +29,7 @@ func main() {
 	http.HandleFunc("/feeds", handler.FeedListHandler)
 	http.HandleFunc("/modify", handler.ModifyFeedHandler)
 	http.HandleFunc("/remove", handler.RemoveFeedHandler)
+	http.HandleFunc("/changelog", handler.ChangelogHandler)
 	http.HandleFunc("/health", handler.HealthHandler)
 
 	server := &http.Server{
