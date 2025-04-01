@@ -100,3 +100,51 @@ WantedBy=multi-user.target
    sudo systemctl status podconfig.service
    ```
 
+## Deployment with Docker
+
+You can also deploy Podconfig and Podsync using Docker Compose. The `docker-compose.yml` file is included in the repository and defines both services.
+
+### Example `docker-compose.yml`:
+
+```yaml
+services:
+  podsync:
+    container_name: podsync
+    image: ghcr.io/mxpv/podsync:latest
+    restart: always
+    ports:
+      - 8050:8050
+    volumes:
+      - ${CONFIG_PATH}/podsync:/app/data/
+      - ${CONFIG_PATH}/podsync/config.toml:/app/config.toml
+
+  podconfig:
+    container_name: podconfig
+    image: ghcr.io/takenobou/podconfig:latest
+    restart: unless-stopped
+    depends_on:
+      - podsync
+    ports:
+      - "8080:8080"
+    environment:
+      PODSYNC_CONFIG_PATH: "/config/config.toml"
+      DOCKER_CONTAINER_NAME: "podsync"
+      SERVER_PORT: "8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${CONFIG_PATH}/podsync/config.toml:/config/config.toml
+```
+
+### Running the services
+
+1. Set the `CONFIG_PATH` environment variable to point to your desired configuration directory:
+   ```bash
+   export CONFIG_PATH=/path/to/your/config
+   ```
+
+2. Start the services using Docker Compose:
+   ```bash
+   docker-compose up -d
+   ```
+
+3. Visit `http://localhost:8080` to access Podconfig.
