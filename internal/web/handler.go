@@ -7,8 +7,11 @@ type Handler struct {
 	PodsyncConfigPath   string
 	DockerContainerName string
 
+	// Inject the feed service (no global var).
+	FeedService *FeedService
+
 	mu      sync.Mutex
-	pending []string //
+	pending []string
 }
 
 // addChange records a message in the pending changelog.

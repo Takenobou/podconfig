@@ -1,7 +1,12 @@
 package config
 
-import "os"
+import (
+	"log"
+	"os"
+	"strconv"
+)
 
+// AppConfig holds environment-based configuration for the app.
 type AppConfig struct {
 	PodsyncConfigPath   string
 	DockerContainerName string
@@ -9,6 +14,7 @@ type AppConfig struct {
 }
 
 // LoadConfig loads configuration from environment variables, falling back to defaults.
+// Minimal validation for SERVER_PORT and warns if the config file doesn’t exist.
 func LoadConfig() *AppConfig {
 	cfg := &AppConfig{
 		PodsyncConfigPath:   os.Getenv("PODSYNC_CONFIG_PATH"),
@@ -24,6 +30,16 @@ func LoadConfig() *AppConfig {
 	}
 	if cfg.ServerPort == "" {
 		cfg.ServerPort = "8080"
+	}
+
+	portNum, err := strconv.Atoi(cfg.ServerPort)
+	if err != nil || portNum < 1 || portNum > 65535 {
+		log.Fatalf("Invalid SERVER_PORT: %s", cfg.ServerPort)
+	}
+
+	if _, err := os.Stat(cfg.PodsyncConfigPath); err != nil {
+		log.Printf("WARNING: No podsync config file found at %s (error: %v)",
+			cfg.PodsyncConfigPath, err)
 	}
 
 	return cfg

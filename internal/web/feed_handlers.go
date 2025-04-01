@@ -12,7 +12,6 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
-var fs = &FeedService{}
 var tmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 	"dict": func(values ...interface{}) (map[string]interface{}, error) {
 		if len(values)%2 != 0 {
@@ -52,7 +51,7 @@ type FeedListItem struct {
 
 // Index handles the main page rendering.
 func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
-	feedList, err := fs.GetFeedList(h.PodsyncConfigPath)
+	feedList, err := h.FeedService.GetFeedList(h.PodsyncConfigPath)
 	if err != nil {
 		log.Printf("Error reading feed list: %v", err)
 		feedList = []FeedListItem{}
@@ -60,7 +59,7 @@ func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 	data := map[string]interface{}{
 		"Message":        r.URL.Query().Get("message"),
 		"Feeds":          feedList,
-		"PendingChanges": h.getChanges(), // pass the pending changes to the template
+		"PendingChanges": h.getChanges(),
 	}
 	if err := tmpl.Execute(w, data); err != nil {
 		log.Printf("Error executing template: %v", err)
@@ -98,13 +97,13 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 			maxAge = v
 		}
 	}
-	feed, err := fs.FetchChannelInfo(youtubeUrl)
+	feed, err := h.FeedService.FetchChannelInfo(youtubeUrl)
 	if err != nil {
 		log.Printf("Error fetching channel info: %v", err)
 		http.Error(w, "Failed to fetch channel info", http.StatusInternalServerError)
 		return
 	}
-	err = fs.AppendFeedToConfig(h.PodsyncConfigPath, feed, updatePeriod, feedFormat, cleanKeepLast, maxAge)
+	err = h.FeedService.AppendFeedToConfig(h.PodsyncConfigPath, feed, updatePeriod, feedFormat, cleanKeepLast, maxAge)
 	if err != nil {
 		log.Printf("Error updating config: %v", err)
 		http.Error(w, "Failed to update config", http.StatusInternalServerError)
@@ -189,7 +188,7 @@ func (h *Handler) RemoveFeedHandler(w http.ResponseWriter, r *http.Request) {
 
 // FeedListHandler returns the list of feeds in HTML (partial).
 func (h *Handler) FeedListHandler(w http.ResponseWriter, r *http.Request) {
-	feedList, err := fs.GetFeedList(h.PodsyncConfigPath)
+	feedList, err := h.FeedService.GetFeedList(h.PodsyncConfigPath)
 	if err != nil {
 		http.Error(w, "Failed to load feed list", http.StatusInternalServerError)
 		return
@@ -231,7 +230,7 @@ func (h *Handler) ModifyFeedHandler(w http.ResponseWriter, r *http.Request) {
 			updates["filters"] = map[string]interface{}{"max_age": v}
 		}
 	}
-	err := fs.ModifyFeed(h.PodsyncConfigPath, feedKey, updates)
+	err := h.FeedService.ModifyFeed(h.PodsyncConfigPath, feedKey, updates)
 	if err != nil {
 		log.Printf("Error modifying feed: %v", err)
 		http.Error(w, "Failed to modify feed", http.StatusInternalServerError)

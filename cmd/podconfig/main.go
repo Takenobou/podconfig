@@ -16,12 +16,16 @@ import (
 func main() {
 	cfg := config.LoadConfig()
 
+	feedService := &web.FeedService{}
+
 	handler := &web.Handler{
 		PodsyncConfigPath:   cfg.PodsyncConfigPath,
 		DockerContainerName: cfg.DockerContainerName,
+		FeedService:         feedService,
 	}
 
 	port := cfg.ServerPort
+
 	http.Handle("/static/", http.FileServer(http.FS(web.StaticFiles)))
 	http.HandleFunc("/", handler.Index)
 	http.HandleFunc("/add", handler.AddFeedHandler)

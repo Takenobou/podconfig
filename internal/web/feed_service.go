@@ -6,62 +6,76 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/pelletier/go-toml/v2"
 )
 
 // FeedService provides business logic for managing feeds.
-type FeedService struct{}
+type FeedService struct {
+	mu sync.Mutex
+}
 
 // GetFeedList returns the list of feeds from the configuration file.
 func (fs *FeedService) GetFeedList(configPath string) ([]FeedListItem, error) {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+
 	content, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, err
 	}
 	var config map[string]interface{}
-	err = toml.Unmarshal(content, &config)
-	if err != nil {
+	if err := toml.Unmarshal(content, &config); err != nil {
 		return nil, err
 	}
+
 	feeds, ok := config["feeds"].(map[string]interface{})
 	if !ok {
 		return []FeedListItem{}, nil
 	}
+
 	var hostname string
 	if serverSection, ok := config["server"].(map[string]interface{}); ok {
 		hostname, _ = serverSection["hostname"].(string)
 	}
+
 	var feedList []FeedListItem
 	for key, v := range feeds {
 		entry, ok := v.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		// Determine feed name (custom title if available)
+		// Determine feed name
 		name := key
 		if custom, ok := entry["custom"].(map[string]interface{}); ok {
 			if t, ok := custom["title"].(string); ok && t != "" {
 				name = t
 			}
 		}
-		// Get the URL for the feed
+
+		// Potential feed source URL
 		urlVal, _ := entry["url"].(string)
+
+		// Construct the feed’s XML URL, if hostname is configured
 		xmlURL := ""
 		if hostname != "" {
 			xmlURL = strings.TrimRight(hostname, "/") + "/" + key + ".xml"
 		}
 
-		// Retrieve settings values (with defaults as needed)
 		updatePeriod, _ := entry["update_period"].(string)
 		format, _ := entry["format"].(string)
+
+		// Retrieve max_age from filters
 		var maxAge string
 		if filters, ok := entry["filters"].(map[string]interface{}); ok {
 			if ma, ok := filters["max_age"]; ok {
 				maxAge = fmt.Sprintf("%v", ma)
 			}
 		}
+
+		// Retrieve keep_last from clean
 		var cleanKeepLast string
 		if clean, ok := entry["clean"].(map[string]interface{}); ok {
 			if ck, ok := clean["keep_last"]; ok {
@@ -80,9 +94,11 @@ func (fs *FeedService) GetFeedList(configPath string) ([]FeedListItem, error) {
 			CleanKeepLast: cleanKeepLast,
 		})
 	}
+
 	sort.Slice(feedList, func(i, j int) bool {
 		return feedList[i].Name < feedList[j].Name
 	})
+
 	return feedList, nil
 }
 
@@ -93,6 +109,7 @@ func (fs *FeedService) FetchChannelInfo(youtubeUrl string) (*NewFeedInfo, error)
 		return nil, err
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP status %d", resp.StatusCode)
 	}
@@ -117,6 +134,7 @@ func (fs *FeedService) FetchChannelInfo(youtubeUrl string) (*NewFeedInfo, error)
 	}
 	profilePic, _ := doc.Find("meta[property='og:image']").Attr("content")
 	feedKey := Sanitise(channelName)
+
 	return &NewFeedInfo{
 		FeedKey:        feedKey,
 		URL:            canonical,
@@ -126,21 +144,27 @@ func (fs *FeedService) FetchChannelInfo(youtubeUrl string) (*NewFeedInfo, error)
 }
 
 // AppendFeedToConfig appends a new feed to the configuration.
-func (fs *FeedService) AppendFeedToConfig(configPath string, feed *NewFeedInfo, updatePeriod string, feedFormat string, cleanKeepLast int, maxAge int) error {
+func (fs *FeedService) AppendFeedToConfig(configPath string, feed *NewFeedInfo, updatePeriod string,
+	feedFormat string, cleanKeepLast int, maxAge int) error {
+
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+
 	content, err := os.ReadFile(configPath)
 	if err != nil {
 		return err
 	}
 	var config map[string]interface{}
-	err = toml.Unmarshal(content, &config)
-	if err != nil {
+	if err := toml.Unmarshal(content, &config); err != nil {
 		return err
 	}
+
 	feeds, ok := config["feeds"].(map[string]interface{})
 	if !ok {
 		feeds = make(map[string]interface{})
 		config["feeds"] = feeds
 	}
+
 	newFeed := map[string]interface{}{
 		"url":             feed.URL,
 		"page_size":       50,
@@ -161,6 +185,7 @@ func (fs *FeedService) AppendFeedToConfig(configPath string, feed *NewFeedInfo, 
 			"explicit":    false,
 		},
 	}
+
 	feeds[feed.FeedKey] = newFeed
 	newContent, err := toml.Marshal(config)
 	if err != nil {
@@ -171,15 +196,18 @@ func (fs *FeedService) AppendFeedToConfig(configPath string, feed *NewFeedInfo, 
 
 // ModifyFeed updates an existing feed's configuration with the provided updates.
 func (fs *FeedService) ModifyFeed(configPath string, feedKey string, updates map[string]interface{}) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+
 	content, err := os.ReadFile(configPath)
 	if err != nil {
 		return err
 	}
 	var config map[string]interface{}
-	err = toml.Unmarshal(content, &config)
-	if err != nil {
+	if err := toml.Unmarshal(content, &config); err != nil {
 		return err
 	}
+
 	feeds, ok := config["feeds"].(map[string]interface{})
 	if !ok {
 		return fmt.Errorf("no feeds found in config")
@@ -192,9 +220,12 @@ func (fs *FeedService) ModifyFeed(configPath string, feedKey string, updates map
 	if !ok {
 		return fmt.Errorf("invalid feed format")
 	}
+
+	// Merge each update into feedMap
 	for key, value := range updates {
 		feedMap[key] = value
 	}
+
 	newContent, err := toml.Marshal(config)
 	if err != nil {
 		return err
@@ -206,7 +237,9 @@ func (fs *FeedService) ModifyFeed(configPath string, feedKey string, updates map
 func Sanitise(name string) string {
 	var sb strings.Builder
 	for _, r := range name {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+		if (r >= 'a' && r <= 'z') ||
+			(r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') {
 			sb.WriteRune(r)
 		}
 	}
