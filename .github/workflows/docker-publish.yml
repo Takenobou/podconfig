@@ -11,7 +11,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  REPO_NAME_LOWER: ${{ github.repository | toLower() }}
 
 jobs:
   build:
@@ -19,15 +18,18 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write
+      id-token: write  # for cosign OIDC-based signing
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Convert repo name to lowercase
+        run: echo "REPO_NAME_LOWER=$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Install cosign
         if: github.event_name != 'pull_request'
-        uses: sigstore/cosign-installer@59acb6260d9c0ba8f4a2f9d9b48431a222b68e20
+        uses: sigstore/cosign-installer@v3.5.0
         with:
           cosign-release: 'v2.2.4'
 
@@ -42,12 +44,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # 2) Extract Docker metadata using the all-lowercase repo name
       - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.REPO_NAME_LOWER }}
 
+      # 3) Build & push Docker image
       - name: Build and push Docker image
         id: build-and-push
         uses: docker/build-push-action@v5
@@ -61,6 +65,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # 4) Sign all published tags with cosign (including :latest)
       - name: Sign the published Docker image
         if: ${{ github.event_name != 'pull_request' }}
         env:
