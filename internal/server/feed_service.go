@@ -1,4 +1,5 @@
-package web
+// Change package to server
+package server
 
 import (
 	"fmt"

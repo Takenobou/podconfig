@@ -10,15 +10,16 @@ import (
 	"time"
 
 	"github.com/Takenobou/podconfig/internal/config"
-	"github.com/Takenobou/podconfig/internal/web"
+	"github.com/Takenobou/podconfig/internal/server"
+	"github.com/Takenobou/podconfig/web"
 )
 
 func main() {
 	cfg := config.LoadConfig()
 
-	feedService := &web.FeedService{}
+	feedService := &server.FeedService{}
 
-	handler := &web.Handler{
+	handler := &server.Handler{
 		PodsyncConfigPath:   cfg.PodsyncConfigPath,
 		DockerContainerName: cfg.DockerContainerName,
 		FeedService:         feedService,
@@ -26,7 +27,11 @@ func main() {
 
 	port := cfg.ServerPort
 
-	http.Handle("/static/", http.FileServer(http.FS(web.StaticFiles)))
+	staticFS, err := web.Static()
+	if err != nil {
+		log.Fatalf("Failed to load static assets: %v", err)
+	}
+	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 	http.HandleFunc("/", handler.Index)
 	http.HandleFunc("/add", handler.AddFeedHandler)
 	http.HandleFunc("/reload", handler.ReloadHandler)

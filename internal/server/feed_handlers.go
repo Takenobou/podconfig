@@ -1,4 +1,5 @@
-package web
+// Change package to server
+package server
 
 import (
 	"encoding/json"
@@ -9,25 +10,36 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/Takenobou/podconfig/web"
 	"github.com/pelletier/go-toml/v2"
 )
 
-var tmpl = template.Must(template.New("index").Funcs(template.FuncMap{
-	"dict": func(values ...interface{}) (map[string]interface{}, error) {
-		if len(values)%2 != 0 {
-			return nil, fmt.Errorf("dict expects an even number of arguments")
-		}
-		dict := make(map[string]interface{}, len(values)/2)
-		for i := 0; i < len(values); i += 2 {
-			key, ok := values[i].(string)
-			if !ok {
-				return nil, fmt.Errorf("dict keys must be strings")
-			}
-			dict[key] = values[i+1]
-		}
-		return dict, nil
-	},
-}).Parse(indexHTML))
+// Replace template initialization to use web.Templates()
+var tmpl *template.Template
+
+func init() {
+	fs, err := web.Templates()
+	if err != nil {
+		panic(err)
+	}
+	tmpl = template.Must(
+		template.New("").Funcs(template.FuncMap{
+			"dict": func(values ...interface{}) (map[string]interface{}, error) {
+				if len(values)%2 != 0 {
+					return nil, fmt.Errorf("dict expects an even number of arguments")
+				}
+				dict := make(map[string]interface{}, len(values)/2)
+				for i := 0; i < len(values); i += 2 {
+					key, ok := values[i].(string)
+					if !ok {
+						return nil, fmt.Errorf("dict keys must be strings")
+					}
+					dict[key] = values[i+1]
+				}
+				return dict, nil
+			},
+		}).ParseFS(fs, "*.html"))
+}
 
 // NewFeedInfo holds information about a feed.
 type NewFeedInfo struct {
@@ -61,7 +73,7 @@ func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 		"Feeds":          feedList,
 		"PendingChanges": h.getChanges(),
 	}
-	if err := tmpl.Execute(w, data); err != nil {
+	if err := tmpl.ExecuteTemplate(w, "index", data); err != nil {
 		log.Printf("Error executing template: %v", err)
 	}
 }
@@ -121,7 +133,7 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 	data := map[string]interface{}{
 		"Message": successMsg,
 	}
-	tmpl.Execute(w, data)
+	tmpl.ExecuteTemplate(w, "index", data)
 }
 
 // RemoveFeedHandler handles removing a feed.
@@ -183,7 +195,7 @@ func (h *Handler) RemoveFeedHandler(w http.ResponseWriter, r *http.Request) {
 	data := map[string]interface{}{
 		"Message": successMsg,
 	}
-	tmpl.Execute(w, data)
+	tmpl.ExecuteTemplate(w, "index", data)
 }
 
 // FeedListHandler returns the list of feeds in HTML (partial).
@@ -248,7 +260,7 @@ func (h *Handler) ModifyFeedHandler(w http.ResponseWriter, r *http.Request) {
 	data := map[string]interface{}{
 		"Message": successMsg,
 	}
-	tmpl.Execute(w, data)
+	tmpl.ExecuteTemplate(w, "index", data)
 }
 
 // ChangelogHandler returns the minimal changelog partial
