@@ -8,23 +8,17 @@
 body {
     background-color: #1f1f1f;
     color: #f3f3f3;
-    padding: 1rem;
+    padding: clamp(0.5rem, 2vw, 1rem);
+    font-size: 0.875rem;
+    line-height: 1.5;
 }
 
 .container {
-    width: 90%;
-    max-width: 400px;
-    margin: 2rem auto;
-    padding: 1rem;
+    width: 100%;
+    max-width: 36rem;
+    margin: clamp(0.5rem, 4vw, 2rem) auto;
+    padding: clamp(0.75rem, 3vw, 1.25rem);
     border: 1px dotted #444;
-}
-
-@media (max-width: 400px) {
-    .container {
-        margin-left: 10px;
-        margin-right: 10px;
-        width: auto;
-    }
 }
 
 .logo {
@@ -54,6 +48,7 @@ body {
     border: 1px dotted #444;
     background-color: #2f2f2f;
     font-weight: bold;
+    overflow-wrap: anywhere;
 }
 
 label {
@@ -63,12 +58,15 @@ label {
 }
 
 input[type="text"],
+input[type="url"],
 select {
     width: 100%;
     padding: 0.5rem;
     background-color: #2f2f2f;
     border: 1px dotted #444;
     color: #f3f3f3;
+    font-size: 1rem;
+    min-width: 0;
 }
 
 button {
@@ -80,6 +78,21 @@ button {
     color: #f3f3f3;
     cursor: pointer;
     font-weight: bold;
+    min-height: 2.75rem;
+    font-size: inherit;
+}
+
+button:disabled {
+    cursor: default;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+a:focus-visible {
+    outline: 1px solid #aaa;
+    outline-offset: 3px;
 }
 
 .btn-add:hover {
@@ -105,22 +118,6 @@ hr {
     font-weight: bold;
 }
 
-#feedListContainer .feed-top button {
-    width: auto !important;
-    margin-top: 0 !important;
-    padding: 0.3rem 0.6rem;
-    border: 1px dotted #444;
-    background-color: #1f1f1f;
-    color: #f3f3f3;
-    cursor: pointer;
-    font-weight: bold;
-}
-
-#feedListContainer .feed-top button:hover {
-    background-color: #333;
-    color: #fff;
-}
-
 .feed-item {
     border-bottom: 1px dotted #444;
     padding: 0.5rem 0;
@@ -131,13 +128,17 @@ hr {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 0.75rem;
 }
 
 .feed-info {
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
-    flex: 1;
+    flex: 1 1 12rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 .feed-name {
     color: #fff;
@@ -147,29 +148,17 @@ hr {
 .feed-name:hover {
     text-decoration: underline;
 }
-.feed-xml {
-    font-size: 0.8rem;
-    color: #aaa;
-    cursor: pointer;
-}
-.feed-xml:hover {
-    color: #fff;
-    text-decoration: underline;
+.feed-top .btn-edit {
+    width: auto;
+    margin-top: 0;
+    padding: 0.3rem 0.6rem;
+    color: #f44336;
+    flex-shrink: 0;
 }
 
-#feedListContainer .feed-top button {
-    width: auto !important;
-    margin-top: 0 !important;
-    padding: 0.3rem 0.6rem;
-    border: 1px dotted #444;
-    background-color: #1f1f1f;
-    color: #f44336;
-    cursor: pointer;
-    font-weight: bold;
-}
-#feedListContainer .feed-top button:hover {
+.feed-top .btn-edit:hover {
     background-color: #f44336;
-    color: #ffffff;
+    color: #fff;
 }
 
 .edit-form {
@@ -192,8 +181,13 @@ button.btn-remove:hover {
 
 .edit-buttons {
     display: flex;
-    gap: 3rem;
+    flex-wrap: wrap;
+    gap: 0.75rem;
     margin-top: 0.5rem;
+}
+
+.edit-buttons button {
+    flex: 1 1 8rem;
 }
 
 .btn-confirm:enabled {
@@ -205,7 +199,7 @@ button.btn-remove:hover {
 }
 
 .btn-confirm:disabled:hover {
-    background-color: #888 !important;
+    background-color: #888;
     cursor: not-allowed;
 }
 
@@ -253,7 +247,7 @@ button.btn-remove:hover {
     display: inline;
 }
 
-#feedListContainer .feed-top .feed-xml {
+.feed-xml {
     width: auto;
     margin-top: 0;
     padding: 0;
@@ -263,14 +257,17 @@ button.btn-remove:hover {
     font-size: 0.8rem;
     font-weight: normal;
     text-align: left;
+    min-height: 2rem;
+    max-width: 100%;
+    overflow-wrap: anywhere;
 }
 
-#feedListContainer .feed-top .feed-xml:enabled:hover {
+.feed-xml:enabled:hover {
     color: #fff;
     text-decoration: underline;
 }
 
-#feedListContainer .feed-top .feed-xml:disabled {
+.feed-xml:disabled {
     color: #777;
     cursor: default;
     text-decoration: none;
