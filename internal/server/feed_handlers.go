@@ -12,7 +12,6 @@ import (
 	"github.com/Takenobou/podconfig/web"
 )
 
-// Replace template initialization to use web.Templates()
 var tmpl *template.Template
 
 func init() {
@@ -37,26 +36,6 @@ func init() {
 				return dict, nil
 			},
 		}).ParseFS(fs, "*.html"))
-}
-
-// NewFeedInfo holds information about a feed.
-type NewFeedInfo struct {
-	FeedKey        string
-	URL            string
-	ChannelName    string
-	ProfilePicture string
-}
-
-// FeedListItem represents an entry in the feed list.
-type FeedListItem struct {
-	Key           string
-	Name          string
-	URL           string
-	XMLURL        string
-	UpdatePeriod  string
-	Format        string
-	MaxAge        string
-	CleanKeepLast string
 }
 
 // Index handles the main page rendering.
@@ -87,25 +66,10 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "YouTube URL is required", http.StatusBadRequest)
 		return
 	}
-	updatePeriod := r.FormValue("update_period")
-	if updatePeriod == "" {
-		updatePeriod = "1h"
-	}
-	feedFormat := r.FormValue("format")
-	if feedFormat == "" {
-		feedFormat = "video"
-	}
-	cleanKeepLast := 20
-	if val := r.FormValue("clean_keep_last"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil {
-			cleanKeepLast = v
-		}
-	}
-	maxAge := 90
-	if val := r.FormValue("max_age"); val != "" {
-		if v, err := strconv.Atoi(val); err == nil {
-			maxAge = v
-		}
+	options, err := parseFeedUpdate(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 	feed, err := h.FeedService.FetchChannelInfo(youtubeUrl)
 	if err != nil {
@@ -113,7 +77,7 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to fetch channel info", http.StatusInternalServerError)
 		return
 	}
-	err = h.FeedService.AppendFeedToConfig(h.PodsyncConfigPath, feed, updatePeriod, feedFormat, cleanKeepLast, maxAge)
+	err = h.FeedService.AppendFeedToConfig(h.PodsyncConfigPath, feed, options)
 	if err != nil {
 		log.Printf("Error updating config: %v", err)
 		http.Error(w, "Failed to update config", http.StatusInternalServerError)
@@ -197,24 +161,12 @@ func (h *Handler) ModifyFeedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "feedKey is required", http.StatusBadRequest)
 		return
 	}
-	updates := make(map[string]interface{})
-	if updatePeriod := r.FormValue("update_period"); updatePeriod != "" {
-		updates["update_period"] = updatePeriod
+	updates, err := parseFeedUpdate(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
-	if feedFormat := r.FormValue("format"); feedFormat != "" {
-		updates["format"] = feedFormat
-	}
-	if cleanKeepLastStr := r.FormValue("clean_keep_last"); cleanKeepLastStr != "" {
-		if v, err := strconv.Atoi(cleanKeepLastStr); err == nil {
-			updates["clean"] = map[string]interface{}{"keep_last": v}
-		}
-	}
-	if maxAgeStr := r.FormValue("max_age"); maxAgeStr != "" {
-		if v, err := strconv.Atoi(maxAgeStr); err == nil {
-			updates["filters"] = map[string]interface{}{"max_age": v}
-		}
-	}
-	err := h.FeedService.ModifyFeed(h.PodsyncConfigPath, feedKey, updates)
+	err = h.FeedService.ModifyFeed(h.PodsyncConfigPath, feedKey, updates)
 	if err != nil {
 		log.Printf("Error modifying feed: %v", err)
 		http.Error(w, "Failed to modify feed", http.StatusInternalServerError)
@@ -248,4 +200,37 @@ func (h *Handler) ChangelogHandler(w http.ResponseWriter, r *http.Request) {
 	if err := tmpl.ExecuteTemplate(w, "changelogOnly", data); err != nil {
 		http.Error(w, "Template error", http.StatusInternalServerError)
 	}
+}
+
+// parseFeedUpdate converts HTTP form values; defaults and validation belong to the service.
+func parseFeedUpdate(r *http.Request) (FeedUpdate, error) {
+	var update FeedUpdate
+	if value := r.FormValue("update_period"); value != "" {
+		update.UpdatePeriod = &value
+	}
+	if value := r.FormValue("format"); value != "" {
+		update.Format = &value
+	}
+	var err error
+	update.CleanKeepLast, err = optionalFormInt(r, "clean_keep_last")
+	if err != nil {
+		return FeedUpdate{}, err
+	}
+	update.MaxAge, err = optionalFormInt(r, "max_age")
+	if err != nil {
+		return FeedUpdate{}, err
+	}
+	return update, update.validate()
+}
+
+func optionalFormInt(r *http.Request, name string) (*int, error) {
+	value := r.FormValue(name)
+	if value == "" {
+		return nil, nil
+	}
+	number, err := strconv.Atoi(value)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s must be an integer", ErrInvalidFeedUpdate, name)
+	}
+	return &number, nil
 }

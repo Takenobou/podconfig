@@ -8,10 +8,60 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/pelletier/go-toml/v2"
 )
+
+// NewFeedInfo holds information about a feed.
+type NewFeedInfo struct {
+	FeedKey        string
+	URL            string
+	ChannelName    string
+	ProfilePicture string
+}
+
+// FeedListItem represents an entry in the feed list.
+type FeedListItem struct {
+	Key           string
+	Name          string
+	URL           string
+	XMLURL        string
+	UpdatePeriod  string
+	Format        string
+	MaxAge        string
+	CleanKeepLast string
+}
+
+// FeedUpdate contains only the settings managed by Podconfig. Nil fields are unchanged.
+type FeedUpdate struct {
+	UpdatePeriod  *string
+	Format        *string
+	CleanKeepLast *int
+	MaxAge        *int
+}
+
+var ErrInvalidFeedUpdate = errors.New("invalid feed settings")
+
+func (u FeedUpdate) validate() error {
+	if u.UpdatePeriod != nil {
+		duration, err := time.ParseDuration(*u.UpdatePeriod)
+		if err != nil || duration <= 0 {
+			return fmt.Errorf("%w: update_period must be a positive duration", ErrInvalidFeedUpdate)
+		}
+	}
+	if u.Format != nil && *u.Format != "audio" && *u.Format != "video" {
+		return fmt.Errorf("%w: format must be audio or video", ErrInvalidFeedUpdate)
+	}
+	if u.CleanKeepLast != nil && *u.CleanKeepLast < 0 {
+		return fmt.Errorf("%w: clean_keep_last cannot be negative", ErrInvalidFeedUpdate)
+	}
+	if u.MaxAge != nil && *u.MaxAge < 0 {
+		return fmt.Errorf("%w: max_age cannot be negative", ErrInvalidFeedUpdate)
+	}
+	return nil
+}
 
 // FeedService provides business logic for managing feeds.
 type FeedService struct {
@@ -141,8 +191,23 @@ func (fs *FeedService) FetchChannelInfo(youtubeUrl string) (*NewFeedInfo, error)
 }
 
 // AppendFeedToConfig appends a new feed to the configuration.
-func (fs *FeedService) AppendFeedToConfig(configPath string, feed *NewFeedInfo, updatePeriod string,
-	feedFormat string, cleanKeepLast int, maxAge int) error {
+func (fs *FeedService) AppendFeedToConfig(configPath string, feed *NewFeedInfo, options FeedUpdate) error {
+	if err := options.validate(); err != nil {
+		return err
+	}
+	updatePeriod, feedFormat, cleanKeepLast, maxAge := "1h", "video", 20, 90
+	if options.UpdatePeriod != nil {
+		updatePeriod = *options.UpdatePeriod
+	}
+	if options.Format != nil {
+		feedFormat = *options.Format
+	}
+	if options.CleanKeepLast != nil {
+		cleanKeepLast = *options.CleanKeepLast
+	}
+	if options.MaxAge != nil {
+		maxAge = *options.MaxAge
+	}
 
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
@@ -184,7 +249,10 @@ func (fs *FeedService) AppendFeedToConfig(configPath string, feed *NewFeedInfo, 
 }
 
 // ModifyFeed updates an existing feed's configuration with the provided updates.
-func (fs *FeedService) ModifyFeed(configPath string, feedKey string, updates map[string]interface{}) error {
+func (fs *FeedService) ModifyFeed(configPath string, feedKey string, updates FeedUpdate) error {
+	if err := updates.validate(); err != nil {
+		return err
+	}
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
@@ -206,9 +274,27 @@ func (fs *FeedService) ModifyFeed(configPath string, feedKey string, updates map
 		return fmt.Errorf("invalid feed format")
 	}
 
-	// Merge each update into feedMap
-	for key, value := range updates {
-		feedMap[key] = value
+	if updates.UpdatePeriod != nil {
+		feedMap["update_period"] = *updates.UpdatePeriod
+	}
+	if updates.Format != nil {
+		feedMap["format"] = *updates.Format
+	}
+	if updates.CleanKeepLast != nil {
+		clean, ok := feedMap["clean"].(map[string]interface{})
+		if !ok {
+			clean = make(map[string]interface{})
+			feedMap["clean"] = clean
+		}
+		clean["keep_last"] = *updates.CleanKeepLast
+	}
+	if updates.MaxAge != nil {
+		filters, ok := feedMap["filters"].(map[string]interface{})
+		if !ok {
+			filters = make(map[string]interface{})
+			feedMap["filters"] = filters
+		}
+		filters["max_age"] = *updates.MaxAge
 	}
 
 	return writeConfig(configPath, config)
