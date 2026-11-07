@@ -119,7 +119,7 @@
       hx-disabled-elt="find button[type='submit']"
       hx-on::after-request="if (event.detail.successful) { this.reset(); this.querySelector('details').open = false; }">
   <label for="youtubeUrl">YouTube URL</label>
-  <input type="text" id="youtubeUrl" name="youtubeUrl" required />
+  <input type="url" id="youtubeUrl" name="youtubeUrl" placeholder="https://www.youtube.com/@channel" required />
 
   <details id="advancedOptions" class="advanced-options">
     <summary><span class="when-closed">Advanced Options</span><span class="when-open">Hide Advanced Options</span></summary>
