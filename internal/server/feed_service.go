@@ -1,7 +1,7 @@
-// Change package to server
 package server
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -23,12 +23,8 @@ func (fs *FeedService) GetFeedList(configPath string) ([]FeedListItem, error) {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	content, err := os.ReadFile(configPath)
+	config, err := readConfig(configPath)
 	if err != nil {
-		return nil, err
-	}
-	var config map[string]interface{}
-	if err := toml.Unmarshal(content, &config); err != nil {
 		return nil, err
 	}
 
@@ -151,12 +147,8 @@ func (fs *FeedService) AppendFeedToConfig(configPath string, feed *NewFeedInfo, 
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	content, err := os.ReadFile(configPath)
+	config, err := readConfig(configPath)
 	if err != nil {
-		return err
-	}
-	var config map[string]interface{}
-	if err := toml.Unmarshal(content, &config); err != nil {
 		return err
 	}
 
@@ -188,11 +180,7 @@ func (fs *FeedService) AppendFeedToConfig(configPath string, feed *NewFeedInfo, 
 	}
 
 	feeds[feed.FeedKey] = newFeed
-	newContent, err := toml.Marshal(config)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(configPath, newContent, 0644)
+	return writeConfig(configPath, config)
 }
 
 // ModifyFeed updates an existing feed's configuration with the provided updates.
@@ -200,12 +188,8 @@ func (fs *FeedService) ModifyFeed(configPath string, feedKey string, updates map
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	content, err := os.ReadFile(configPath)
+	config, err := readConfig(configPath)
 	if err != nil {
-		return err
-	}
-	var config map[string]interface{}
-	if err := toml.Unmarshal(content, &config); err != nil {
 		return err
 	}
 
@@ -227,11 +211,7 @@ func (fs *FeedService) ModifyFeed(configPath string, feedKey string, updates map
 		feedMap[key] = value
 	}
 
-	newContent, err := toml.Marshal(config)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(configPath, newContent, 0644)
+	return writeConfig(configPath, config)
 }
 
 // Sanitise creates a feed key from the given channel name.
@@ -245,4 +225,47 @@ func Sanitise(name string) string {
 		}
 	}
 	return strings.ToLower(sb.String())
+}
+
+var ErrFeedNotFound = errors.New("feed not found")
+
+// RemoveFeed shares the same lock as all other configuration operations.
+func (fs *FeedService) RemoveFeed(configPath, feedKey string) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	config, err := readConfig(configPath)
+	if err != nil {
+		return err
+	}
+	feeds, ok := config["feeds"].(map[string]interface{})
+	if !ok {
+		return ErrFeedNotFound
+	}
+	if _, exists := feeds[feedKey]; !exists {
+		return ErrFeedNotFound
+	}
+	delete(feeds, feedKey)
+	return writeConfig(configPath, config)
+}
+
+// Callers hold the service lock across the entire read-modify-write operation.
+func readConfig(path string) (map[string]interface{}, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var config map[string]interface{}
+	if err := toml.Unmarshal(content, &config); err != nil {
+		return nil, err
+	}
+	return config, nil
+}
+
+func writeConfig(path string, config map[string]interface{}) error {
+	content, err := toml.Marshal(config)
+	if err != nil {
+		return err
+	}
+	// Write in place: deployments bind-mount this individual file into both containers.
+	return os.WriteFile(path, content, 0644)
 }

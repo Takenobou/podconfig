@@ -1,17 +1,15 @@
-// Change package to server
 package server
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/Takenobou/podconfig/web"
-	"github.com/pelletier/go-toml/v2"
 )
 
 // Replace template initialization to use web.Templates()
@@ -147,40 +145,14 @@ func (h *Handler) RemoveFeedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "feedKey is required", http.StatusBadRequest)
 		return
 	}
-	content, err := os.ReadFile(h.PodsyncConfigPath)
-	if err != nil {
-		log.Printf("Error reading config: %v", err)
-		http.Error(w, "Failed to read config", http.StatusInternalServerError)
-		return
-	}
-	var config map[string]interface{}
-	err = toml.Unmarshal(content, &config)
-	if err != nil {
-		log.Printf("Error unmarshalling config: %v", err)
-		http.Error(w, "Failed to parse config", http.StatusInternalServerError)
-		return
-	}
-	feeds, ok := config["feeds"].(map[string]interface{})
-	if !ok {
-		http.Error(w, "No feeds found", http.StatusInternalServerError)
-		return
-	}
-	if _, exists := feeds[feedKey]; !exists {
+	err := h.FeedService.RemoveFeed(h.PodsyncConfigPath, feedKey)
+	if errors.Is(err, ErrFeedNotFound) {
 		http.Error(w, "Feed not found", http.StatusNotFound)
 		return
 	}
-	delete(feeds, feedKey)
-	config["feeds"] = feeds
-	newContent, err := toml.Marshal(config)
 	if err != nil {
-		log.Printf("Error marshalling config: %v", err)
-		http.Error(w, "Failed to update config", http.StatusInternalServerError)
-		return
-	}
-	err = os.WriteFile(h.PodsyncConfigPath, newContent, 0644)
-	if err != nil {
-		log.Printf("Error writing config: %v", err)
-		http.Error(w, "Failed to write config", http.StatusInternalServerError)
+		log.Printf("Error removing feed: %v", err)
+		http.Error(w, "Failed to remove feed", http.StatusInternalServerError)
 		return
 	}
 
