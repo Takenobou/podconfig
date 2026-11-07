@@ -65,14 +65,11 @@
   <div class="feed-top">
     <div class="feed-info">
       <a href="{{ .URL }}" target="_blank" rel="noopener" class="feed-name">{{ .Name }}</a>
-      <span class="feed-xml" role="button" tabindex="0" data-xmlurl="{{ .XMLURL }}"
-            hx-on:click="navigator.clipboard.writeText(this.dataset.xmlurl)
-              .then(() => { this.textContent = 'Copied XML path to clipboard!'; })
-              .catch(() => { this.textContent = 'Could not copy XML path. Try again.'; })
-              .finally(() => setTimeout(() => { this.textContent = 'Copy XML path to clipboard'; }, 1000))"
-            hx-on:keydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.click(); }">
-        Copy XML path to clipboard
-      </span>
+      <div class="feed-xml-status"
+           {{ if .XMLURL }}hx-get="/feed-xml?feedKey={{ .Key | urlquery }}" hx-trigger="load, every 10s"
+           hx-target="this" hx-swap="innerHTML" hx-sync="this:drop"{{ end }}>
+        {{ template "xmlCopy" . }}
+      </div>
     </div>
     <button type="button" class="btn-edit" aria-expanded="false"
             hx-on:click="const form = this.closest('.feed-item').querySelector('form'); form.hidden = !form.hidden; this.textContent = form.hidden ? 'Edit Feed' : 'Cancel Edit'; this.setAttribute('aria-expanded', String(!form.hidden));">
@@ -119,7 +116,7 @@
       hx-disabled-elt="find button[type='submit']"
       hx-on::after-request="if (event.detail.successful) { this.reset(); this.querySelector('details').open = false; }">
   <label for="youtubeUrl">YouTube URL</label>
-  <input type="text" id="youtubeUrl" name="youtubeUrl" required />
+  <input type="url" id="youtubeUrl" name="youtubeUrl" placeholder="https://www.youtube.com/@channel" required />
 
   <details id="advancedOptions" class="advanced-options">
     <summary><span class="when-closed">Advanced Options</span><span class="when-open">Hide Advanced Options</span></summary>
@@ -161,4 +158,16 @@
     <div class="changelog-message"><i>No pending changes.</i></div>
   {{ end }}
 </div>
+{{ end }}
+
+{{ define "xmlCopy" }}
+<button type="button" class="feed-xml"
+        {{ if .XMLAvailable }}data-xmlurl="{{ .XMLURL }}"
+        hx-on:click="navigator.clipboard.writeText(this.dataset.xmlurl)
+          .then(() => { this.textContent = 'Copied XML path to clipboard!'; })
+          .catch(() => { this.textContent = 'Could not copy XML path. Try again.'; })
+          .finally(() => setTimeout(() => { this.textContent = 'Copy XML path to clipboard'; }, 1000))"
+        {{ else }}disabled{{ end }}>
+  {{ if .XMLAvailable }}Copy XML path to clipboard{{ else if .XMLURL }}XML not available yet{{ else }}XML URL not configured{{ end }}
+</button>
 {{ end }}
