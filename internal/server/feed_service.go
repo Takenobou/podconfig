@@ -3,14 +3,12 @@ package server
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/pelletier/go-toml/v2"
 )
 
@@ -147,47 +145,6 @@ func (fs *FeedService) GetFeedList(configPath string) ([]FeedListItem, error) {
 	})
 
 	return feedList, nil
-}
-
-// FetchChannelInfo retrieves channel info from the given YouTube URL.
-func (fs *FeedService) FetchChannelInfo(youtubeUrl string) (*NewFeedInfo, error) {
-	resp, err := http.Get(youtubeUrl)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP status %d", resp.StatusCode)
-	}
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	canonical, exists := doc.Find("link[rel='canonical']").Attr("href")
-	if !exists || canonical == "" {
-		return nil, fmt.Errorf("canonical link not found")
-	}
-	if !strings.Contains(canonical, "/channel/") {
-		channelId, exists := doc.Find("meta[itemprop='channelId']").Attr("content")
-		if !exists || channelId == "" {
-			return nil, fmt.Errorf("channel id not found")
-		}
-		canonical = "https://www.youtube.com/channel/" + channelId
-	}
-	channelName, exists := doc.Find("meta[property='og:title']").Attr("content")
-	if !exists || channelName == "" {
-		channelName = "Unknown Channel"
-	}
-	profilePic, _ := doc.Find("meta[property='og:image']").Attr("content")
-	feedKey := Sanitise(channelName)
-
-	return &NewFeedInfo{
-		FeedKey:        feedKey,
-		URL:            canonical,
-		ChannelName:    channelName,
-		ProfilePicture: profilePic,
-	}, nil
 }
 
 // AppendFeedToConfig appends a new feed to the configuration.

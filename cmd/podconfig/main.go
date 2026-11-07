@@ -23,6 +23,7 @@ func main() {
 		PodsyncConfigPath:   cfg.PodsyncConfigPath,
 		DockerContainerName: cfg.DockerContainerName,
 		FeedService:         feedService,
+		YouTubeClient:       server.NewYouTubeClient(),
 	}
 
 	port := cfg.ServerPort

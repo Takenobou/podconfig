@@ -7,8 +7,8 @@ type Handler struct {
 	PodsyncConfigPath   string
 	DockerContainerName string
 
-	// Inject the feed service (no global var).
-	FeedService *FeedService
+	FeedService   *FeedService
+	YouTubeClient *YouTubeClient
 
 	mu      sync.Mutex
 	pending []string

@@ -71,7 +71,7 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	feed, err := h.FeedService.FetchChannelInfo(youtubeUrl)
+	feed, err := h.YouTubeClient.FetchChannelInfo(r.Context(), youtubeUrl)
 	if err != nil {
 		log.Printf("Error fetching channel info: %v", err)
 		http.Error(w, "Failed to fetch channel info", http.StatusInternalServerError)
