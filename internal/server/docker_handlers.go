@@ -1,9 +1,7 @@
-// Change package to server
 package server
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,14 +13,14 @@ import (
 // ReloadHandler restarts the Docker container using the Docker API client.
 func (h *Handler) ReloadHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		h.renderError(w, r, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	cli, err := client.New(client.FromEnv)
 	if err != nil {
 		log.Printf("Error creating Docker client: %v", err)
-		http.Error(w, "Failed to create Docker client", http.StatusInternalServerError)
+		h.renderError(w, r, "Failed to create Docker client", http.StatusInternalServerError)
 		return
 	}
 
@@ -34,7 +32,7 @@ func (h *Handler) ReloadHandler(w http.ResponseWriter, r *http.Request) {
 	_, err = cli.ContainerRestart(ctx, h.DockerContainerName, client.ContainerRestartOptions{Timeout: &intTimeout})
 	if err != nil {
 		log.Printf("Error restarting container: %v", err)
-		http.Error(w, "Failed to reload docker container", http.StatusInternalServerError)
+		h.renderError(w, r, "Failed to reload docker container", http.StatusInternalServerError)
 		return
 	}
 
@@ -43,15 +41,5 @@ func (h *Handler) ReloadHandler(w http.ResponseWriter, r *http.Request) {
 	successMsg := fmt.Sprintf("Docker container '%s' reloaded successfully!", h.DockerContainerName)
 	log.Printf("Reload successful: %s", successMsg)
 
-	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"message": successMsg})
-		return
-	}
-
-	data := map[string]interface{}{
-		"Message": successMsg,
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(data)
+	h.renderSuccess(w, r, successMsg)
 }

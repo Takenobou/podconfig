@@ -226,3 +226,29 @@ button.btn-remove:hover {
     margin: 0.15rem 0;
     font-style: italic;
 }
+/* Native disclosure controls and HTMX request states. */
+[hidden] {
+    display: none !important;
+}
+
+.advanced-options {
+    margin: 0.5rem 0;
+}
+
+.advanced-options summary {
+    color: #aaa;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.advanced-options .when-open,
+.advanced-options[open] .when-closed,
+.request-busy,
+.htmx-request .request-idle {
+    display: none;
+}
+
+.advanced-options[open] .when-open,
+.htmx-request .request-busy {
+    display: inline;
+}

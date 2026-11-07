@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -63,151 +62,96 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	youtubeUrl := r.FormValue("youtubeUrl")
 	if youtubeUrl == "" {
-		http.Error(w, "YouTube URL is required", http.StatusBadRequest)
+		h.renderError(w, r, "YouTube URL is required", http.StatusBadRequest)
 		return
 	}
 	options, err := parseFeedUpdate(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		h.renderError(w, r, err.Error(), http.StatusBadRequest)
 		return
 	}
 	feed, err := h.YouTubeClient.FetchChannelInfo(r.Context(), youtubeUrl)
 	if err != nil {
 		log.Printf("Error fetching channel info: %v", err)
-		http.Error(w, "Failed to fetch channel info", http.StatusInternalServerError)
+		h.renderError(w, r, "Failed to fetch channel info", http.StatusInternalServerError)
 		return
 	}
 	err = h.FeedService.AppendFeedToConfig(h.PodsyncConfigPath, feed, options)
 	if errors.Is(err, ErrFeedExists) {
-		http.Error(w, err.Error(), http.StatusConflict)
+		h.renderError(w, r, err.Error(), http.StatusConflict)
 		return
 	}
 	if errors.Is(err, ErrInvalidFeedUpdate) {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		h.renderError(w, r, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if err != nil {
 		log.Printf("Error updating config: %v", err)
-		http.Error(w, "Failed to update config", http.StatusInternalServerError)
+		h.renderError(w, r, "Failed to update config", http.StatusInternalServerError)
 		return
 	}
 
 	h.addChange(fmt.Sprintf("Added feed '%s'", feed.FeedKey))
 
 	successMsg := fmt.Sprintf("Feed for channel '%s' added successfully!", feed.ChannelName)
-	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"message": successMsg})
-		return
-	}
-	data := map[string]interface{}{
-		"Message": successMsg,
-	}
-	tmpl.ExecuteTemplate(w, "index", data)
+	h.renderSuccess(w, r, successMsg)
 }
 
 // RemoveFeedHandler handles removing a feed.
 func (h *Handler) RemoveFeedHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		h.renderError(w, r, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	feedKey := r.FormValue("feedKey")
 	if feedKey == "" {
-		http.Error(w, "feedKey is required", http.StatusBadRequest)
+		h.renderError(w, r, "feedKey is required", http.StatusBadRequest)
 		return
 	}
 	err := h.FeedService.RemoveFeed(h.PodsyncConfigPath, feedKey)
 	if errors.Is(err, ErrFeedNotFound) {
-		http.Error(w, "Feed not found", http.StatusNotFound)
+		h.renderError(w, r, "Feed not found", http.StatusNotFound)
 		return
 	}
 	if err != nil {
 		log.Printf("Error removing feed: %v", err)
-		http.Error(w, "Failed to remove feed", http.StatusInternalServerError)
+		h.renderError(w, r, "Failed to remove feed", http.StatusInternalServerError)
 		return
 	}
 
 	h.addChange(fmt.Sprintf("Removed feed '%s'", feedKey))
 
 	successMsg := fmt.Sprintf("Feed for channel '%s' removed successfully!", feedKey)
-	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"message": successMsg})
-		return
-	}
-	data := map[string]interface{}{
-		"Message": successMsg,
-	}
-	tmpl.ExecuteTemplate(w, "index", data)
-}
-
-// FeedListHandler returns the list of feeds in HTML (partial).
-func (h *Handler) FeedListHandler(w http.ResponseWriter, r *http.Request) {
-	feedList, err := h.FeedService.GetFeedList(h.PodsyncConfigPath)
-	if err != nil {
-		http.Error(w, "Failed to load feed list", http.StatusInternalServerError)
-		return
-	}
-	data := map[string]interface{}{
-		"Feeds": feedList,
-	}
-	w.Header().Set("Content-Type", "text/html")
-	if err := tmpl.ExecuteTemplate(w, "feedList", data); err != nil {
-		http.Error(w, "Template error", http.StatusInternalServerError)
-	}
+	h.renderSuccess(w, r, successMsg)
 }
 
 // ModifyFeedHandler handles updating an existing feed.
 func (h *Handler) ModifyFeedHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		h.renderError(w, r, "Method Not Allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	feedKey := r.FormValue("feedKey")
 	if feedKey == "" {
-		http.Error(w, "feedKey is required", http.StatusBadRequest)
+		h.renderError(w, r, "feedKey is required", http.StatusBadRequest)
 		return
 	}
 	updates, err := parseFeedUpdate(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		h.renderError(w, r, err.Error(), http.StatusBadRequest)
 		return
 	}
 	err = h.FeedService.ModifyFeed(h.PodsyncConfigPath, feedKey, updates)
 	if err != nil {
 		log.Printf("Error modifying feed: %v", err)
-		http.Error(w, "Failed to modify feed", http.StatusInternalServerError)
+		h.renderError(w, r, "Failed to modify feed", http.StatusInternalServerError)
 		return
 	}
 
 	h.addChange(fmt.Sprintf("Modified feed '%s'", feedKey))
 
-	successMsg := fmt.Sprintf("Feed '%s' modified successfully!.", feedKey)
-	if r.Header.Get("X-Requested-With") == "XMLHttpRequest" {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"message": successMsg})
-		return
-	}
-	data := map[string]interface{}{
-		"Message": successMsg,
-	}
-	tmpl.ExecuteTemplate(w, "index", data)
-}
-
-// ChangelogHandler returns the minimal changelog partial
-func (h *Handler) ChangelogHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	data := map[string]interface{}{
-		"PendingChanges": h.getChanges(),
-	}
-	w.Header().Set("Content-Type", "text/html")
-	if err := tmpl.ExecuteTemplate(w, "changelogOnly", data); err != nil {
-		http.Error(w, "Template error", http.StatusInternalServerError)
-	}
+	successMsg := fmt.Sprintf("Feed '%s' modified successfully!", feedKey)
+	h.renderSuccess(w, r, successMsg)
 }
 
 // parseFeedUpdate converts HTTP form values; defaults and validation belong to the service.
