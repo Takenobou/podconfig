@@ -129,3 +129,28 @@ func TestAddUsesServiceDefaults(t *testing.T) {
 		t.Fatalf("unexpected defaults: %#v", feed)
 	}
 }
+
+func TestAddRejectsDuplicatesWithoutChangingConfig(t *testing.T) {
+	for _, test := range []struct{ name, key, url string }{
+		{"same key", "demo", "replacement"},
+		{"same channel renamed", "renamed", "original"},
+		{"empty key", "", "replacement"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			path := testConfig(t, "[feeds.demo]\nurl='original'\nquality='low'\n")
+			before, _ := os.ReadFile(path)
+			err := (&FeedService{}).AppendFeedToConfig(path, &NewFeedInfo{FeedKey: test.key, URL: test.url}, FeedUpdate{})
+			want := ErrFeedExists
+			if test.key == "" {
+				want = ErrInvalidFeedUpdate
+			}
+			if !errors.Is(err, want) {
+				t.Fatalf("got %v, want %v", err, want)
+			}
+			after, _ := os.ReadFile(path)
+			if string(before) != string(after) {
+				t.Fatal("rejected add changed existing config")
+			}
+		})
+	}
+}

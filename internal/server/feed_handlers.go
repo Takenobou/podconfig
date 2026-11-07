@@ -78,6 +78,14 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err = h.FeedService.AppendFeedToConfig(h.PodsyncConfigPath, feed, options)
+	if errors.Is(err, ErrFeedExists) {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	if errors.Is(err, ErrInvalidFeedUpdate) {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 	if err != nil {
 		log.Printf("Error updating config: %v", err)
 		http.Error(w, "Failed to update config", http.StatusInternalServerError)

@@ -223,6 +223,19 @@ func (fs *FeedService) AppendFeedToConfig(configPath string, feed *NewFeedInfo, 
 		config["feeds"] = feeds
 	}
 
+	if feed.FeedKey == "" {
+		return fmt.Errorf("%w: channel name must contain letters or numbers", ErrInvalidFeedUpdate)
+	}
+	if _, exists := feeds[feed.FeedKey]; exists {
+		return fmt.Errorf("%w: key %s", ErrFeedExists, feed.FeedKey)
+	}
+	for _, value := range feeds {
+		existing, ok := value.(map[string]interface{})
+		if ok && feed.URL != "" && existing["url"] == feed.URL {
+			return fmt.Errorf("%w: channel %s", ErrFeedExists, feed.ChannelName)
+		}
+	}
+
 	newFeed := map[string]interface{}{
 		"url":             feed.URL,
 		"page_size":       50,
@@ -314,6 +327,7 @@ func Sanitise(name string) string {
 }
 
 var ErrFeedNotFound = errors.New("feed not found")
+var ErrFeedExists = errors.New("feed already exists")
 
 // RemoveFeed shares the same lock as all other configuration operations.
 func (fs *FeedService) RemoveFeed(configPath, feedKey string) error {
