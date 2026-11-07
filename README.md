@@ -10,7 +10,7 @@ Podconfig is a lightweight web configuration interface for [Podsync](https://git
 
 ## Prerequisites
 
-- [Go](https://golang.org/dl/) (version 1.16 or higher recommended)
+- [Go](https://golang.org/dl/) (version 1.27.3 or higher)
 - Podsync installed and configured via Docker
 
 ## Installation
