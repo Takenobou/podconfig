@@ -4,7 +4,8 @@ async function apiRequest(path, options = {}, responseType = 'json') {
   options.headers = Object.assign(defaultHeaders, options.headers || {});
   const response = await fetch(path, options);
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    const message = (await response.text()).trim();
+    throw new Error(message || `Request failed: ${response.status}`);
   }
   if (responseType === 'json') {
     return response.json();
