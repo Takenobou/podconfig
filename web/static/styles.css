@@ -252,3 +252,26 @@ button.btn-remove:hover {
 .htmx-request .request-busy {
     display: inline;
 }
+
+#feedListContainer .feed-top .feed-xml {
+    width: auto;
+    margin-top: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: #aaa;
+    font-size: 0.8rem;
+    font-weight: normal;
+    text-align: left;
+}
+
+#feedListContainer .feed-top .feed-xml:enabled:hover {
+    color: #fff;
+    text-decoration: underline;
+}
+
+#feedListContainer .feed-top .feed-xml:disabled {
+    color: #777;
+    cursor: default;
+    text-decoration: none;
+}

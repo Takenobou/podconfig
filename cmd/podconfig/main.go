@@ -39,6 +39,7 @@ func main() {
 	http.HandleFunc("/modify", handler.ModifyFeedHandler)
 	http.HandleFunc("/remove", handler.RemoveFeedHandler)
 	http.HandleFunc("/health", handler.HealthHandler)
+	http.HandleFunc("/feed-xml", handler.FeedXMLHandler)
 
 	server := &http.Server{
 		Addr: ":" + port,

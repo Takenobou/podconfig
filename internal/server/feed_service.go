@@ -26,6 +26,7 @@ type FeedListItem struct {
 	Name          string
 	URL           string
 	XMLURL        string
+	XMLAvailable  bool
 	UpdatePeriod  string
 	Format        string
 	MaxAge        string
