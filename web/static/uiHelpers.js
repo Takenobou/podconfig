@@ -1,7 +1,10 @@
 // Utility functions for UI interactions
 export function showMessage(text) {
   const container = document.getElementById('messageContainer');
-  container.innerHTML = `<div class="message">${text}</div>`;
+  const message = document.createElement('div');
+  message.className = 'message';
+  message.textContent = text;
+  container.replaceChildren(message);
 }
 
 export function copyText(el, text) {

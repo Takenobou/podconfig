@@ -99,7 +99,7 @@ addForm.addEventListener("submit", async e => {
     await refreshChangelogWrapper();
   } catch (err) {
     console.error(err);
-    showMessage('Error adding feed.');
+    showMessage(err.message || 'Error adding feed.');
   } finally {
     btn.disabled = false;
     btn.textContent = orig;
@@ -154,7 +154,7 @@ function confirmEdit(key) {
       await refreshChangelogWrapper();
     } catch (err) {
       console.error(err);
-      showMessage('Error modifying feed.');
+      showMessage(err.message || 'Error modifying feed.');
     }
   })();
 }

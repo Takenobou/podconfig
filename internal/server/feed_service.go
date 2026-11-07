@@ -1,17 +1,65 @@
-// Change package to server
 package server
 
 import (
+	"errors"
 	"fmt"
-	"net/http"
 	"os"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/pelletier/go-toml/v2"
 )
+
+// NewFeedInfo holds information about a feed.
+type NewFeedInfo struct {
+	FeedKey        string
+	URL            string
+	ChannelName    string
+	ProfilePicture string
+}
+
+// FeedListItem represents an entry in the feed list.
+type FeedListItem struct {
+	Key           string
+	Name          string
+	URL           string
+	XMLURL        string
+	UpdatePeriod  string
+	Format        string
+	MaxAge        string
+	CleanKeepLast string
+}
+
+// FeedUpdate contains only the settings managed by Podconfig. Nil fields are unchanged.
+type FeedUpdate struct {
+	UpdatePeriod  *string
+	Format        *string
+	CleanKeepLast *int
+	MaxAge        *int
+}
+
+var ErrInvalidFeedUpdate = errors.New("invalid feed settings")
+
+func (u FeedUpdate) validate() error {
+	if u.UpdatePeriod != nil {
+		duration, err := time.ParseDuration(*u.UpdatePeriod)
+		if err != nil || duration <= 0 {
+			return fmt.Errorf("%w: update_period must be a positive duration", ErrInvalidFeedUpdate)
+		}
+	}
+	if u.Format != nil && *u.Format != "audio" && *u.Format != "video" {
+		return fmt.Errorf("%w: format must be audio or video", ErrInvalidFeedUpdate)
+	}
+	if u.CleanKeepLast != nil && *u.CleanKeepLast < 0 {
+		return fmt.Errorf("%w: clean_keep_last cannot be negative", ErrInvalidFeedUpdate)
+	}
+	if u.MaxAge != nil && *u.MaxAge < 0 {
+		return fmt.Errorf("%w: max_age cannot be negative", ErrInvalidFeedUpdate)
+	}
+	return nil
+}
 
 // FeedService provides business logic for managing feeds.
 type FeedService struct {
@@ -23,12 +71,8 @@ func (fs *FeedService) GetFeedList(configPath string) ([]FeedListItem, error) {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	content, err := os.ReadFile(configPath)
+	config, err := readConfig(configPath)
 	if err != nil {
-		return nil, err
-	}
-	var config map[string]interface{}
-	if err := toml.Unmarshal(content, &config); err != nil {
 		return nil, err
 	}
 
@@ -103,60 +147,30 @@ func (fs *FeedService) GetFeedList(configPath string) ([]FeedListItem, error) {
 	return feedList, nil
 }
 
-// FetchChannelInfo retrieves channel info from the given YouTube URL.
-func (fs *FeedService) FetchChannelInfo(youtubeUrl string) (*NewFeedInfo, error) {
-	resp, err := http.Get(youtubeUrl)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP status %d", resp.StatusCode)
-	}
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	canonical, exists := doc.Find("link[rel='canonical']").Attr("href")
-	if !exists || canonical == "" {
-		return nil, fmt.Errorf("canonical link not found")
-	}
-	if !strings.Contains(canonical, "/channel/") {
-		channelId, exists := doc.Find("meta[itemprop='channelId']").Attr("content")
-		if !exists || channelId == "" {
-			return nil, fmt.Errorf("channel id not found")
-		}
-		canonical = "https://www.youtube.com/channel/" + channelId
-	}
-	channelName, exists := doc.Find("meta[property='og:title']").Attr("content")
-	if !exists || channelName == "" {
-		channelName = "Unknown Channel"
-	}
-	profilePic, _ := doc.Find("meta[property='og:image']").Attr("content")
-	feedKey := Sanitise(channelName)
-
-	return &NewFeedInfo{
-		FeedKey:        feedKey,
-		URL:            canonical,
-		ChannelName:    channelName,
-		ProfilePicture: profilePic,
-	}, nil
-}
-
 // AppendFeedToConfig appends a new feed to the configuration.
-func (fs *FeedService) AppendFeedToConfig(configPath string, feed *NewFeedInfo, updatePeriod string,
-	feedFormat string, cleanKeepLast int, maxAge int) error {
+func (fs *FeedService) AppendFeedToConfig(configPath string, feed *NewFeedInfo, options FeedUpdate) error {
+	if err := options.validate(); err != nil {
+		return err
+	}
+	updatePeriod, feedFormat, cleanKeepLast, maxAge := "1h", "video", 20, 90
+	if options.UpdatePeriod != nil {
+		updatePeriod = *options.UpdatePeriod
+	}
+	if options.Format != nil {
+		feedFormat = *options.Format
+	}
+	if options.CleanKeepLast != nil {
+		cleanKeepLast = *options.CleanKeepLast
+	}
+	if options.MaxAge != nil {
+		maxAge = *options.MaxAge
+	}
 
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	content, err := os.ReadFile(configPath)
+	config, err := readConfig(configPath)
 	if err != nil {
-		return err
-	}
-	var config map[string]interface{}
-	if err := toml.Unmarshal(content, &config); err != nil {
 		return err
 	}
 
@@ -164,6 +178,19 @@ func (fs *FeedService) AppendFeedToConfig(configPath string, feed *NewFeedInfo, 
 	if !ok {
 		feeds = make(map[string]interface{})
 		config["feeds"] = feeds
+	}
+
+	if feed.FeedKey == "" {
+		return fmt.Errorf("%w: channel name must contain letters or numbers", ErrInvalidFeedUpdate)
+	}
+	if _, exists := feeds[feed.FeedKey]; exists {
+		return fmt.Errorf("%w: key %s", ErrFeedExists, feed.FeedKey)
+	}
+	for _, value := range feeds {
+		existing, ok := value.(map[string]interface{})
+		if ok && feed.URL != "" && existing["url"] == feed.URL {
+			return fmt.Errorf("%w: channel %s", ErrFeedExists, feed.ChannelName)
+		}
 	}
 
 	newFeed := map[string]interface{}{
@@ -188,24 +215,19 @@ func (fs *FeedService) AppendFeedToConfig(configPath string, feed *NewFeedInfo, 
 	}
 
 	feeds[feed.FeedKey] = newFeed
-	newContent, err := toml.Marshal(config)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(configPath, newContent, 0644)
+	return writeConfig(configPath, config)
 }
 
 // ModifyFeed updates an existing feed's configuration with the provided updates.
-func (fs *FeedService) ModifyFeed(configPath string, feedKey string, updates map[string]interface{}) error {
+func (fs *FeedService) ModifyFeed(configPath string, feedKey string, updates FeedUpdate) error {
+	if err := updates.validate(); err != nil {
+		return err
+	}
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
-	content, err := os.ReadFile(configPath)
+	config, err := readConfig(configPath)
 	if err != nil {
-		return err
-	}
-	var config map[string]interface{}
-	if err := toml.Unmarshal(content, &config); err != nil {
 		return err
 	}
 
@@ -222,16 +244,30 @@ func (fs *FeedService) ModifyFeed(configPath string, feedKey string, updates map
 		return fmt.Errorf("invalid feed format")
 	}
 
-	// Merge each update into feedMap
-	for key, value := range updates {
-		feedMap[key] = value
+	if updates.UpdatePeriod != nil {
+		feedMap["update_period"] = *updates.UpdatePeriod
+	}
+	if updates.Format != nil {
+		feedMap["format"] = *updates.Format
+	}
+	if updates.CleanKeepLast != nil {
+		clean, ok := feedMap["clean"].(map[string]interface{})
+		if !ok {
+			clean = make(map[string]interface{})
+			feedMap["clean"] = clean
+		}
+		clean["keep_last"] = *updates.CleanKeepLast
+	}
+	if updates.MaxAge != nil {
+		filters, ok := feedMap["filters"].(map[string]interface{})
+		if !ok {
+			filters = make(map[string]interface{})
+			feedMap["filters"] = filters
+		}
+		filters["max_age"] = *updates.MaxAge
 	}
 
-	newContent, err := toml.Marshal(config)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(configPath, newContent, 0644)
+	return writeConfig(configPath, config)
 }
 
 // Sanitise creates a feed key from the given channel name.
@@ -245,4 +281,48 @@ func Sanitise(name string) string {
 		}
 	}
 	return strings.ToLower(sb.String())
+}
+
+var ErrFeedNotFound = errors.New("feed not found")
+var ErrFeedExists = errors.New("feed already exists")
+
+// RemoveFeed shares the same lock as all other configuration operations.
+func (fs *FeedService) RemoveFeed(configPath, feedKey string) error {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	config, err := readConfig(configPath)
+	if err != nil {
+		return err
+	}
+	feeds, ok := config["feeds"].(map[string]interface{})
+	if !ok {
+		return ErrFeedNotFound
+	}
+	if _, exists := feeds[feedKey]; !exists {
+		return ErrFeedNotFound
+	}
+	delete(feeds, feedKey)
+	return writeConfig(configPath, config)
+}
+
+// Callers hold the service lock across the entire read-modify-write operation.
+func readConfig(path string) (map[string]interface{}, error) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var config map[string]interface{}
+	if err := toml.Unmarshal(content, &config); err != nil {
+		return nil, err
+	}
+	return config, nil
+}
+
+func writeConfig(path string, config map[string]interface{}) error {
+	content, err := toml.Marshal(config)
+	if err != nil {
+		return err
+	}
+	// Write in place: deployments bind-mount this individual file into both containers.
+	return os.WriteFile(path, content, 0644)
 }
