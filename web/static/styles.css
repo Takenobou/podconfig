@@ -65,8 +65,16 @@ select {
     background-color: #2f2f2f;
     border: 1px dotted #444;
     color: #f3f3f3;
-    font-size: max(1rem, 16px);
+    font-size: 1rem;
     min-width: 0;
+}
+
+@media (pointer: coarse) {
+    input[type="text"],
+    input[type="url"],
+    select {
+        font-size: max(1rem, 16px);
+    }
 }
 
 button {
