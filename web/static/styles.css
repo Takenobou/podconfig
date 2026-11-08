@@ -65,7 +65,7 @@ select {
     background-color: #2f2f2f;
     border: 1px dotted #444;
     color: #f3f3f3;
-    font-size: 1rem;
+    font-size: max(1rem, 16px);
     min-width: 0;
 }
 
