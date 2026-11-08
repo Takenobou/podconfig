@@ -149,6 +149,11 @@
 <div id="changelogWrapper" hx-swap-oob="innerHTML">{{ template "changelogOnly" . }}</div>
 {{ end }}
 
+{{ define "reloadResult" }}
+{{ template "message" . }}
+<div id="changelogWrapper" hx-swap-oob="innerHTML">{{ template "changelogOnly" . }}</div>
+{{ end }}
+
 {{ define "changelogOnly" }}
 <div class="changelog-container">
   <div class="changelog-heading">Changes Pending Reload:</div>

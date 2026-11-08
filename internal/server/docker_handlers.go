@@ -41,5 +41,13 @@ func (h *Handler) ReloadHandler(w http.ResponseWriter, r *http.Request) {
 	successMsg := fmt.Sprintf("Docker container '%s' reloaded successfully!", h.DockerContainerName)
 	log.Printf("Reload successful: %s", successMsg)
 
+	if r.Header.Get("HX-Request") == "true" {
+		// Reloading does not change feeds. Preserve their current copy and edit state.
+		renderTemplate(w, http.StatusOK, "reloadResult", map[string]interface{}{
+			"Message":        successMsg,
+			"PendingChanges": h.getChanges(),
+		})
+		return
+	}
 	h.renderSuccess(w, r, successMsg)
 }

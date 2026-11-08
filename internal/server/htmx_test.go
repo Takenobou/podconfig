@@ -174,6 +174,9 @@ func TestHTMXReload(t *testing.T) {
 				t.Fatalf("got %d restarts", restarts.Load())
 			}
 			if success {
+				if doc.Find("#feedListWrapper").Length() != 0 {
+					t.Fatal("reload must preserve the feed list and its XML availability state")
+				}
 				if len(h.getChanges()) != 0 || !strings.Contains(doc.Find("#changelogWrapper").Text(), "No pending changes") {
 					t.Fatal("successful reload did not clear pending changes")
 				}
