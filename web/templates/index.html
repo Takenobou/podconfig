@@ -21,27 +21,27 @@
 {{ end }}
 
 {{ define "commonFields" }}
-<label for="{{ .Prefix }}update_period">Feed Update Frequency</label>
+<label for="{{ .Prefix }}update_period">Update interval</label>
 <input type="text" name="update_period"
        id="{{ .Prefix }}update_period"
        placeholder="1h"
        value="{{ .UpdatePeriod }}"
        data-original="{{ .UpdatePeriod }}" />
 
-<label for="{{ .Prefix }}format">Feed Format</label>
+<label for="{{ .Prefix }}format">Format</label>
 <select name="format" id="{{ .Prefix }}format" data-original="{{ if eq .Format "audio" }}audio{{ else }}video{{ end }}">
   <option value="video" {{ if eq .Format "video" }}selected{{ end }}>Video</option>
   <option value="audio" {{ if eq .Format "audio" }}selected{{ end }}>Audio</option>
 </select>
 
-<label for="{{ .Prefix }}max_age">Max Episode Age</label>
+<label for="{{ .Prefix }}max_age">Max age</label>
 <input type="text" name="max_age"
        id="{{ .Prefix }}max_age"
        placeholder="90"
        value="{{ .MaxAge }}"
        data-original="{{ .MaxAge }}" />
 
-<label for="{{ .Prefix }}clean_keep_last">Max Episode Amount</label>
+<label for="{{ .Prefix }}clean_keep_last">Episode limit</label>
 <input type="text" name="clean_keep_last"
        id="{{ .Prefix }}clean_keep_last"
        placeholder="20"
@@ -55,7 +55,7 @@
   {{ range .Feeds }}
     {{ template "feedItem" . }}
   {{ else }}
-    <div class="message">No feeds found.</div>
+    <p>No feeds.</p>
   {{ end }}
 </div>
 {{ end }}
@@ -72,8 +72,8 @@
       </div>
     </div>
     <button type="button" class="btn-edit" aria-expanded="false"
-            hx-on:click="const form = this.closest('.feed-item').querySelector('form'); form.hidden = !form.hidden; this.textContent = form.hidden ? 'Edit Feed' : 'Cancel Edit'; this.setAttribute('aria-expanded', String(!form.hidden));">
-      Edit Feed
+            hx-on:click="const form = this.closest('.feed-item').querySelector('form'); form.hidden = !form.hidden; this.textContent = form.hidden ? 'Edit' : 'Cancel'; this.setAttribute('aria-expanded', String(!form.hidden));">
+      Edit
     </button>
   </div>
   <form class="edit-form" hidden method="post" action="/modify" hx-post="/modify"
@@ -89,11 +89,11 @@
     ) }}
     <div class="edit-buttons">
       <button type="submit" class="btn-confirm" disabled>
-        <span class="request-idle">Save Edit</span><span class="request-busy">Saving…</span>
+        <span class="request-idle">Save</span><span class="request-busy">Saving…</span>
       </button>
       <button type="button" class="btn-remove" hx-post="/remove" hx-disabled-elt="this"
-              hx-on::confirm="if (this.dataset.confirmed !== 'true') { event.preventDefault(); this.dataset.confirmed = 'true'; this.textContent = 'Confirm Remove'; setTimeout(() => { this.dataset.confirmed = 'false'; this.textContent = 'Remove Feed'; }, 3000); }">
-        Remove Feed
+              hx-on::confirm="if (this.dataset.confirmed !== 'true') { event.preventDefault(); this.dataset.confirmed = 'true'; this.textContent = 'Confirm removal'; setTimeout(() => { this.dataset.confirmed = 'false'; this.textContent = 'Remove'; }, 3000); }">
+        Remove
       </button>
     </div>
   </form>
@@ -110,7 +110,7 @@
 </h2>
 
 <div id="messageContainer" aria-live="polite">{{ template "message" . }}</div>
-<div id="networkError" class="message" role="alert" hidden>Unable to reach the server. Please try again.</div>
+<div id="networkError" class="message" role="alert" hidden>Server unavailable.</div>
 
 <form id="addFeedForm" method="post" action="/add" hx-post="/add"
       hx-disabled-elt="find button[type='submit']"
@@ -119,19 +119,19 @@
   <input type="url" id="youtubeUrl" name="youtubeUrl" placeholder="https://www.youtube.com/@channel" required />
 
   <details id="advancedOptions" class="advanced-options">
-    <summary><span class="when-closed">Advanced Options</span><span class="when-open">Hide Advanced Options</span></summary>
+    <summary><span class="when-closed">Options</span><span class="when-open">Hide options</span></summary>
     {{ template "commonFields" (dict "Prefix" "") }}
   </details>
 
   <button type="submit" id="addFeedBtn" class="btn-add">
-    <span class="request-idle">Add Feed</span><span class="request-busy">Adding Feed…</span>
+    <span class="request-idle">Add feed</span><span class="request-busy">Adding…</span>
   </button>
 </form>
 
 <hr />
 <form method="post" action="/reload" hx-post="/reload" hx-disabled-elt="find button">
   <button type="submit" id="reloadBtn" class="btn-reload">
-    <span class="request-idle">Reload Podsync Docker Container</span><span class="request-busy">Reloading Container…</span>
+    <span class="request-idle">Reload Podsync</span><span class="request-busy">Reloading…</span>
   </button>
 </form>
 <div id="changelogWrapper">{{ template "changelogOnly" . }}</div>
@@ -155,24 +155,24 @@
 {{ end }}
 
 {{ define "changelogOnly" }}
+{{ if .PendingChanges }}
 <div class="changelog-container">
-  <div class="changelog-heading">Changes Pending Reload:</div>
+  <div class="changelog-heading">Pending reload</div>
   {{ range .PendingChanges }}
-    <div class="changelog-message"><i>{{ . }}</i></div>
-  {{ else }}
-    <div class="changelog-message"><i>No pending changes.</i></div>
+    <div class="changelog-message">{{ . }}</div>
   {{ end }}
 </div>
+{{ end }}
 {{ end }}
 
 {{ define "xmlCopy" }}
 <button type="button" class="feed-xml"
         {{ if .XMLAvailable }}data-xmlurl="{{ .XMLURL }}"
         hx-on:click="navigator.clipboard.writeText(this.dataset.xmlurl)
-          .then(() => { this.textContent = 'Copied XML path to clipboard!'; })
-          .catch(() => { this.textContent = 'Could not copy XML path. Try again.'; })
-          .finally(() => setTimeout(() => { this.textContent = 'Copy XML path to clipboard'; }, 1000))"
+          .then(() => { this.textContent = 'Copied'; })
+          .catch(() => { this.textContent = 'Copy failed'; })
+          .finally(() => setTimeout(() => { this.textContent = 'Copy feed URL'; }, 1000))"
         {{ else }}disabled{{ end }}>
-  {{ if .XMLAvailable }}Copy XML path to clipboard{{ else if .XMLURL }}XML not available yet{{ else }}XML URL not configured{{ end }}
+  Copy feed URL
 </button>
 {{ end }}

@@ -81,6 +81,7 @@ func TestFeedXMLBecomesAvailable(t *testing.T) {
 	}))
 	defer upstream.Close()
 	h := &Handler{PodsyncConfigPath: testConfig(t, fmt.Sprintf("[server]\nhostname=%q\n[feeds.demo]\nurl='source'\n", upstream.URL)), FeedService: &FeedService{}}
+	var previousLabel string
 	for _, available := range []bool{false, true} {
 		ready.Store(available)
 		w := httptest.NewRecorder()
@@ -88,6 +89,15 @@ func TestFeedXMLBecomesAvailable(t *testing.T) {
 		if (w.Code == stopPolling) != available {
 			t.Fatalf("availability did not update: HTTP %d", w.Code)
 		}
+		doc, err := goquery.NewDocumentFromReader(w.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		label := strings.TrimSpace(doc.Find("button.feed-xml").Text())
+		if previousLabel != "" && label != previousLabel {
+			t.Fatal("availability changes should not replace the copy label with status messages")
+		}
+		previousLabel = label
 	}
 }
 

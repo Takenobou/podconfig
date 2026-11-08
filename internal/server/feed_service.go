@@ -41,23 +41,23 @@ type FeedUpdate struct {
 	MaxAge        *int
 }
 
-var ErrInvalidFeedUpdate = errors.New("invalid feed settings")
+var ErrInvalidFeedUpdate = errors.New("Invalid settings")
 
 func (u FeedUpdate) validate() error {
 	if u.UpdatePeriod != nil {
 		duration, err := time.ParseDuration(*u.UpdatePeriod)
 		if err != nil || duration <= 0 {
-			return fmt.Errorf("%w: update_period must be a positive duration", ErrInvalidFeedUpdate)
+			return fmt.Errorf("%w: update interval must be positive (e.g. 1h).", ErrInvalidFeedUpdate)
 		}
 	}
 	if u.Format != nil && *u.Format != "audio" && *u.Format != "video" {
-		return fmt.Errorf("%w: format must be audio or video", ErrInvalidFeedUpdate)
+		return fmt.Errorf("%w: format must be audio or video.", ErrInvalidFeedUpdate)
 	}
 	if u.CleanKeepLast != nil && *u.CleanKeepLast < 0 {
-		return fmt.Errorf("%w: clean_keep_last cannot be negative", ErrInvalidFeedUpdate)
+		return fmt.Errorf("%w: episode limit cannot be negative.", ErrInvalidFeedUpdate)
 	}
 	if u.MaxAge != nil && *u.MaxAge < 0 {
-		return fmt.Errorf("%w: max_age cannot be negative", ErrInvalidFeedUpdate)
+		return fmt.Errorf("%w: max age cannot be negative.", ErrInvalidFeedUpdate)
 	}
 	return nil
 }
@@ -182,7 +182,7 @@ func (fs *FeedService) AppendFeedToConfig(configPath string, feed *NewFeedInfo, 
 	}
 
 	if feed.FeedKey == "" {
-		return fmt.Errorf("%w: channel name must contain letters or numbers", ErrInvalidFeedUpdate)
+		return fmt.Errorf("%w: channel name needs letters or numbers.", ErrInvalidFeedUpdate)
 	}
 	if _, exists := feeds[feed.FeedKey]; exists {
 		return fmt.Errorf("%w: key %s", ErrFeedExists, feed.FeedKey)

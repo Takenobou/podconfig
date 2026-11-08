@@ -62,7 +62,7 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	youtubeUrl := r.FormValue("youtubeUrl")
 	if youtubeUrl == "" {
-		h.renderError(w, r, "YouTube URL is required", http.StatusBadRequest)
+		h.renderError(w, r, "Enter a YouTube URL.", http.StatusBadRequest)
 		return
 	}
 	options, err := parseFeedUpdate(r)
@@ -73,12 +73,12 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 	feed, err := h.YouTubeClient.FetchChannelInfo(r.Context(), youtubeUrl)
 	if err != nil {
 		log.Printf("Error fetching channel info: %v", err)
-		h.renderError(w, r, "Failed to fetch channel info", http.StatusInternalServerError)
+		h.renderError(w, r, "Could not load the channel.", http.StatusInternalServerError)
 		return
 	}
 	err = h.FeedService.AppendFeedToConfig(h.PodsyncConfigPath, feed, options)
 	if errors.Is(err, ErrFeedExists) {
-		h.renderError(w, r, err.Error(), http.StatusConflict)
+		h.renderError(w, r, "Feed already exists.", http.StatusConflict)
 		return
 	}
 	if errors.Is(err, ErrInvalidFeedUpdate) {
@@ -87,53 +87,53 @@ func (h *Handler) AddFeedHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		log.Printf("Error updating config: %v", err)
-		h.renderError(w, r, "Failed to update config", http.StatusInternalServerError)
+		h.renderError(w, r, "Could not save the feed.", http.StatusInternalServerError)
 		return
 	}
 
-	h.addChange(fmt.Sprintf("Added feed '%s'", feed.FeedKey))
+	h.addChange(fmt.Sprintf("Added %s", feed.FeedKey))
 
-	successMsg := fmt.Sprintf("Feed for channel '%s' added successfully!", feed.ChannelName)
+	successMsg := "Feed added."
 	h.renderSuccess(w, r, successMsg)
 }
 
 // RemoveFeedHandler handles removing a feed.
 func (h *Handler) RemoveFeedHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		h.renderError(w, r, "Method Not Allowed", http.StatusMethodNotAllowed)
+		h.renderError(w, r, "Method not allowed.", http.StatusMethodNotAllowed)
 		return
 	}
 	feedKey := r.FormValue("feedKey")
 	if feedKey == "" {
-		h.renderError(w, r, "feedKey is required", http.StatusBadRequest)
+		h.renderError(w, r, "Feed not found.", http.StatusBadRequest)
 		return
 	}
 	err := h.FeedService.RemoveFeed(h.PodsyncConfigPath, feedKey)
 	if errors.Is(err, ErrFeedNotFound) {
-		h.renderError(w, r, "Feed not found", http.StatusNotFound)
+		h.renderError(w, r, "Feed not found.", http.StatusNotFound)
 		return
 	}
 	if err != nil {
 		log.Printf("Error removing feed: %v", err)
-		h.renderError(w, r, "Failed to remove feed", http.StatusInternalServerError)
+		h.renderError(w, r, "Could not remove the feed.", http.StatusInternalServerError)
 		return
 	}
 
-	h.addChange(fmt.Sprintf("Removed feed '%s'", feedKey))
+	h.addChange(fmt.Sprintf("Removed %s", feedKey))
 
-	successMsg := fmt.Sprintf("Feed for channel '%s' removed successfully!", feedKey)
+	successMsg := "Feed removed."
 	h.renderSuccess(w, r, successMsg)
 }
 
 // ModifyFeedHandler handles updating an existing feed.
 func (h *Handler) ModifyFeedHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		h.renderError(w, r, "Method Not Allowed", http.StatusMethodNotAllowed)
+		h.renderError(w, r, "Method not allowed.", http.StatusMethodNotAllowed)
 		return
 	}
 	feedKey := r.FormValue("feedKey")
 	if feedKey == "" {
-		h.renderError(w, r, "feedKey is required", http.StatusBadRequest)
+		h.renderError(w, r, "Feed not found.", http.StatusBadRequest)
 		return
 	}
 	updates, err := parseFeedUpdate(r)
@@ -144,13 +144,13 @@ func (h *Handler) ModifyFeedHandler(w http.ResponseWriter, r *http.Request) {
 	err = h.FeedService.ModifyFeed(h.PodsyncConfigPath, feedKey, updates)
 	if err != nil {
 		log.Printf("Error modifying feed: %v", err)
-		h.renderError(w, r, "Failed to modify feed", http.StatusInternalServerError)
+		h.renderError(w, r, "Could not save the feed.", http.StatusInternalServerError)
 		return
 	}
 
-	h.addChange(fmt.Sprintf("Modified feed '%s'", feedKey))
+	h.addChange(fmt.Sprintf("Updated %s", feedKey))
 
-	successMsg := fmt.Sprintf("Feed '%s' modified successfully!", feedKey)
+	successMsg := "Feed saved."
 	h.renderSuccess(w, r, successMsg)
 }
 
@@ -164,25 +164,25 @@ func parseFeedUpdate(r *http.Request) (FeedUpdate, error) {
 		update.Format = &value
 	}
 	var err error
-	update.CleanKeepLast, err = optionalFormInt(r, "clean_keep_last")
+	update.CleanKeepLast, err = optionalFormInt(r, "clean_keep_last", "episode limit")
 	if err != nil {
 		return FeedUpdate{}, err
 	}
-	update.MaxAge, err = optionalFormInt(r, "max_age")
+	update.MaxAge, err = optionalFormInt(r, "max_age", "max age")
 	if err != nil {
 		return FeedUpdate{}, err
 	}
 	return update, update.validate()
 }
 
-func optionalFormInt(r *http.Request, name string) (*int, error) {
+func optionalFormInt(r *http.Request, name, label string) (*int, error) {
 	value := r.FormValue(name)
 	if value == "" {
 		return nil, nil
 	}
 	number, err := strconv.Atoi(value)
 	if err != nil {
-		return nil, fmt.Errorf("%w: %s must be an integer", ErrInvalidFeedUpdate, name)
+		return nil, fmt.Errorf("%w: %s must be a whole number.", ErrInvalidFeedUpdate, label)
 	}
 	return &number, nil
 }

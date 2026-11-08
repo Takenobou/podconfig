@@ -16,7 +16,7 @@ func (h *Handler) renderSuccess(w http.ResponseWriter, r *http.Request, message 
 	feeds, err := h.FeedService.GetFeedList(h.PodsyncConfigPath)
 	if err != nil {
 		log.Printf("Error refreshing feed list: %v", err)
-		h.renderError(w, r, "Change saved, but the feed list could not be refreshed. Please reload the page.", http.StatusInternalServerError)
+		h.renderError(w, r, "Saved. Refresh to update the feed list.", http.StatusInternalServerError)
 		return
 	}
 	renderTemplate(w, http.StatusOK, "mutationResult", map[string]interface{}{
@@ -39,7 +39,7 @@ func renderTemplate(w http.ResponseWriter, status int, name string, data interfa
 	var body bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&body, name, data); err != nil {
 		log.Printf("Error rendering %s: %v", name, err)
-		http.Error(w, "Failed to render response", http.StatusInternalServerError)
+		http.Error(w, "Could not load the page.", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

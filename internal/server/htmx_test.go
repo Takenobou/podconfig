@@ -55,11 +55,11 @@ func TestHTMXFeedWorkflow(t *testing.T) {
 	if added.Find("#feedListWrapper[hx-swap-oob] .feed-item").Length() != 1 {
 		t.Fatal("added feed missing from swap")
 	}
-	if !strings.Contains(added.Find("#changelogWrapper[hx-swap-oob]").Text(), "Added feed") {
+	if !strings.Contains(added.Find("#changelogWrapper[hx-swap-oob]").Text(), "Added ") {
 		t.Fatal("pending change missing")
 	}
-	if !strings.Contains(added.Find(".message").First().Text(), "Demo & Friends") {
-		t.Fatal("channel title missing")
+	if !strings.Contains(added.Find(".feed-name").Text(), "Demo & Friends") {
+		t.Fatal("channel title missing from feed list")
 	}
 	before, _ := os.ReadFile(h.PodsyncConfigPath)
 	duplicate := postHTMX(t, h.AddFeedHandler, "/add", form, http.StatusConflict)
@@ -79,7 +79,7 @@ func TestHTMXFeedWorkflow(t *testing.T) {
 		t.Fatal("invalid update should leave forms intact")
 	}
 	removed := postHTMX(t, h.RemoveFeedHandler, "/remove", url.Values{"feedKey": {"demofriends"}}, http.StatusOK)
-	if removed.Find(".feed-item").Length() != 0 || !strings.Contains(removed.Find("#feedListWrapper").Text(), "No feeds found") {
+	if removed.Find(".feed-item").Length() != 0 || !strings.Contains(removed.Find("#feedListWrapper").Text(), "No feeds.") {
 		t.Fatal("removed feed still displayed")
 	}
 	if len(h.getChanges()) != 3 {
@@ -98,7 +98,7 @@ func TestPlainFormRedirectsAfterMutation(t *testing.T) {
 		t.Fatalf("got HTTP %d: %s", w.Code, w.Body.String())
 	}
 	location, err := url.Parse(w.Header().Get("Location"))
-	if err != nil || location.Path != "/" || !strings.Contains(location.Query().Get("message"), "added successfully") {
+	if err != nil || location.Path != "/" || location.Query().Get("message") == "" {
 		t.Fatalf("unexpected redirect: %s", w.Header().Get("Location"))
 	}
 }
@@ -177,7 +177,7 @@ func TestHTMXReload(t *testing.T) {
 				if doc.Find("#feedListWrapper").Length() != 0 {
 					t.Fatal("reload must preserve the feed list and its XML availability state")
 				}
-				if len(h.getChanges()) != 0 || !strings.Contains(doc.Find("#changelogWrapper").Text(), "No pending changes") {
+				if len(h.getChanges()) != 0 || strings.TrimSpace(doc.Find("#changelogWrapper").Text()) != "" {
 					t.Fatal("successful reload did not clear pending changes")
 				}
 			} else {
