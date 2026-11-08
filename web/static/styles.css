@@ -65,8 +65,28 @@ select {
     background-color: #2f2f2f;
     border: 1px dotted #444;
     color: #f3f3f3;
-    font-size: max(1rem, 16px);
+    font-size: 1rem;
     min-width: 0;
+}
+
+select {
+    -webkit-appearance: none;
+    appearance: none;
+    border-radius: 0;
+    padding-right: 2rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%23aaa' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 0.75rem;
+    cursor: pointer;
+}
+
+@media (pointer: coarse) {
+    input[type="text"],
+    input[type="url"],
+    select {
+        font-size: max(1rem, 16px);
+    }
 }
 
 button {
