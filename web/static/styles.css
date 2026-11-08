@@ -65,7 +65,7 @@ select {
     background-color: #2f2f2f;
     border: 1px dotted #444;
     color: #f3f3f3;
-    font-size: 1rem;
+    font-size: max(1rem, 16px);
     min-width: 0;
 }
 
@@ -86,20 +86,26 @@ button:disabled {
     cursor: default;
 }
 
-button:focus-visible,
-input:focus-visible,
-select:focus-visible,
+button:focus,
+input:focus,
+select:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+button:enabled:is(:hover, :focus-visible, :active) {
+    border-color: currentColor;
+}
+
+input:is(:hover, :focus),
+select:is(:hover, :focus) {
+    border-color: #aaa;
+}
+
 summary:focus-visible,
 a:focus-visible {
     outline: 1px solid #aaa;
     outline-offset: 3px;
-}
-
-.btn-add:hover {
-    background-color: #4caf50;
-}
-.btn-reload:hover {
-    background-color: #2196F3;
 }
 
 hr {
@@ -156,27 +162,12 @@ hr {
     flex-shrink: 0;
 }
 
-.feed-top .btn-edit:hover {
-    background-color: #f44336;
-    color: #fff;
-}
-
 .edit-form {
     margin-top: 0.5rem;
 }
 
-button.btn-confirm:hover {
-    background-color: #4caf50;
-    color: #fff;
-}
-
 button.btn-remove {
     color: #f44336;
-}
-
-button.btn-remove:hover {
-    background-color: #f44336;
-    color: #fff;
 }
 
 .edit-buttons {
@@ -196,10 +187,6 @@ button.btn-remove:hover {
 
 .btn-confirm:disabled {
     color: #888;
-}
-
-.btn-confirm:disabled:hover {
-    background-color: #888;
     cursor: not-allowed;
 }
 
@@ -262,7 +249,7 @@ button.btn-remove:hover {
     overflow-wrap: anywhere;
 }
 
-.feed-xml:enabled:hover {
+.feed-xml:enabled:is(:hover, :focus-visible, :active) {
     color: #fff;
     text-decoration: underline;
 }
